@@ -73,8 +73,8 @@ jobs:
           envs: REPO_NAME,GITHUB_TOKEN,GITHUB_ACTOR
           script: |
             # 1. Crear directorio del proyecto si no existe
-            mkdir -p /home/deploy/cmdb
-            cd /home/deploy/cmdb
+            mkdir -p /home/devops/apps/raizdigital-infra/apps/cmdb
+            cd /home/devops/apps/raizdigital-infra/apps/cmdb
 
             # 2. Login al registro de GitHub en el droplet para poder descargar las imágenes
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
