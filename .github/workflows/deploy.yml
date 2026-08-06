@@ -100,7 +100,7 @@ jobs:
                   timeout: 5s
                   retries: 5
 
-               backend:
+              backend:
                 image: ghcr.io/REPO_NAME_PLACEHOLDER/backend:latest
                 container_name: cmdb-backend
                 restart: always
