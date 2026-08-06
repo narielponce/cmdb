@@ -13,13 +13,6 @@ from .database import engine, Base, get_db
 from .config import settings
 from . import models, schemas, crud, simulator, pdf_generator
 
-# Create/recreate tables by wiping the schema in dev environment
-with engine.connect() as conn:
-    conn.execute(text("DROP SCHEMA public CASCADE;"))
-    conn.execute(text("CREATE SCHEMA public;"))
-    conn.execute(text("GRANT ALL ON SCHEMA public TO public;"))
-    conn.commit()
-
 Base.metadata.create_all(bind=engine)
 
 # ==========================================
