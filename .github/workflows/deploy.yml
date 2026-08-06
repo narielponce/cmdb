@@ -120,14 +120,27 @@ jobs:
                 image: ghcr.io/REPO_NAME_PLACEHOLDER/frontend:latest
                 container_name: cmdb-frontend
                 restart: always
-                ports:
-                  - "80:80"
+                labels:
+                  - "traefik.enable=true"
+                  - "traefik.http.routers.cmdb.rule=Host(`cmdb.raizdigital.com.ar`)"
+                  - "traefik.http.routers.cmdb.entrypoints=websecure"
+                  - "traefik.http.routers.cmdb.tls=true"
+                  - "traefik.http.routers.cmdb.tls.certresolver=letsencrypt"
+                  - "traefik.http.services.cmdb.loadbalancer.server.port=80"
+                  - "traefik.docker.network=traefik-network"
+                networks:
+                  - default
+                  - traefik-network
                 depends_on:
                   - backend
 
             volumes:
               postgres_data:
               remitos_data:
+
+            networks:
+              traefik-network:
+                external: true
             EOF
 
             # Reemplazar REPO_NAME_PLACEHOLDER por el nombre real del repositorio
