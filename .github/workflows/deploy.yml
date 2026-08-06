@@ -1,0 +1,149 @@
+# .github/workflows/deploy.yml
+name: CD - Build and Deploy CMDB
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Downcase Repository Name
+        run: |
+          echo "REPO_NAME=${GITHUB_REPOSITORY,,}" >> ${GITHUB_ENV}
+
+      - name: Build and Push Backend Image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./backend
+          push: true
+          tags: ghcr.io/${{ env.REPO_NAME }}/backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and Push Frontend Image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./frontend
+          push: true
+          tags: ghcr.io/${{ env.REPO_NAME }}/frontend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+
+    steps:
+      - name: Checkout code (to get docker-compose.yml)
+        uses: actions/checkout@v3
+
+      - name: Downcase Repository Name
+        run: |
+          echo "REPO_NAME=${GITHUB_REPOSITORY,,}" >> ${GITHUB_ENV}
+
+      - name: Execute Remote Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          envs: REPO_NAME,GITHUB_TOKEN,GITHUB_ACTOR
+          script: |
+            # 1. Crear directorio del proyecto si no existe
+            mkdir -p /home/deploy/cmdb
+            cd /home/deploy/cmdb
+
+            # 2. Login al registro de GitHub en el droplet para poder descargar las imágenes
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            # 3. Crear el docker-compose.yml con las imágenes del registro
+            cat << 'EOF' > docker-compose.yml
+            version: '3.8'
+
+            services:
+              db:
+                image: postgres:15-alpine
+                container_name: cmdb-db
+                restart: always
+                environment:
+                  POSTGRES_USER: postgres
+                  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+                  POSTGRES_DB: cmdb
+                volumes:
+                  - postgres_data:/var/lib/postgresql/data
+                healthcheck:
+                  test: ["CMD-SHELL", "pg_isready -U postgres"]
+                  interval: 5s
+                  timeout: 5s
+                  retries: 5
+
+               backend:
+                image: ghcr.io/REPO_NAME_PLACEHOLDER/backend:latest
+                container_name: cmdb-backend
+                restart: always
+                environment:
+                  - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/cmdb
+                  - UPLOAD_DIR=/app/adjuntos_remitos
+                  - SUPERADMIN_USER=${SUPERADMIN_USER}
+                  - SUPERADMIN_PASSWORD=${SUPERADMIN_PASSWORD}
+                  - SECRET_KEY=${SECRET_KEY}
+                volumes:
+                  - remitos_data:/app/adjuntos_remitos
+                depends_on:
+                  db:
+                    condition: service_healthy
+
+              frontend:
+                image: ghcr.io/REPO_NAME_PLACEHOLDER/frontend:latest
+                container_name: cmdb-frontend
+                restart: always
+                ports:
+                  - "80:80"
+                depends_on:
+                  - backend
+
+            volumes:
+              postgres_data:
+              remitos_data:
+            EOF
+
+            # Reemplazar REPO_NAME_PLACEHOLDER por el nombre real del repositorio
+            sed -i "s|REPO_NAME_PLACEHOLDER|$REPO_NAME|g" docker-compose.yml
+
+            # 4. Crear archivo .env de producción
+            cat << EOF > .env
+            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            SUPERADMIN_USER=${{ secrets.SUPERADMIN_USER }}
+            SUPERADMIN_PASSWORD=${{ secrets.SUPERADMIN_PASSWORD }}
+            SECRET_KEY=${{ secrets.SECRET_KEY }}
+            EOF
+
+            # 5. Descargar las imágenes actualizadas y reiniciar los servicios
+            docker compose pull
+            docker compose up -d --remove-orphans
+
+            # 6. Limpiar imágenes huérfanas/viejas
+            docker image prune -f

@@ -1,0 +1,44 @@
+# .gitignore
+# Python caches and compiles
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env
+.venv
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Node / Frontend dependencies & builds
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# SQLite Database Files
+*.db
+*.sqlite
+*.sqlite3
+
+# CSV and Excel sheets (Data sheets)
+*.csv
+*.xlsx
+*.xls
+
+# PDF logs, receipts and attachments
+adjuntos_remitos/
+actas/
+*.pdf
+
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# Archives
+monolith_archive/
+*.zip
+*.tar.gz
+*.tgz

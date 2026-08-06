@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: cmdb-db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: cmdb
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: cmdb-backend
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/cmdb
+      - UPLOAD_DIR=/app/adjuntos_remitos
+      - SUPERADMIN_USER=${SUPERADMIN_USER:-admin}
+      - SUPERADMIN_PASSWORD=${SUPERADMIN_PASSWORD:-adminpassword}
+      - SECRET_KEY=${SECRET_KEY:-supersecretkeyfornettrackcmdbsecurity2026}
+    volumes:
+      - remitos_data:/app/adjuntos_remitos
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8081:8000"
+
+  frontend:
+    build: ./frontend
+    container_name: cmdb-frontend
+    restart: always
+    ports:
+      - "8088:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  remitos_data:
