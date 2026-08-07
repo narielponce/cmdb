@@ -67,7 +67,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in filteredInventory" :key="item.serial + item.nombre">
+              <tr v-for="item in paginatedInventory" :key="item.serial + item.nombre">
                 <td>{{ item.tipo_equipo }}</td>
                 <td><strong>{{ item.nombre }}</strong></td>
                 <td>{{ item.marca }}</td>
@@ -82,6 +82,48 @@
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- Controles de Paginación -->
+        <div v-if="filteredInventory.length > 0" class="flex flex-col sm:flex-row justify-between items-center gap-4 mt-4 bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div class="text-sm text-slate-600 font-medium">
+            Mostrando {{ (currentPage - 1) * pageSize + 1 }} - {{ Math.min(currentPage * pageSize, filteredInventory.length) }} de {{ filteredInventory.length }} registros
+          </div>
+          <div class="flex items-center gap-1">
+            <button 
+              @click="currentPage > 1 && (currentPage--)" 
+              :disabled="currentPage === 1"
+              class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none transition text-sm font-medium shadow-sm"
+            >
+              ◀ Anterior
+            </button>
+            
+            <button 
+              v-for="p in visiblePages" 
+              :key="p"
+              @click="currentPage = p"
+              :class="['px-3 py-1.5 rounded-lg text-sm font-semibold transition shadow-sm', p === currentPage ? 'bg-primary text-white' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50']"
+            >
+              {{ p }}
+            </button>
+
+            <button 
+              @click="currentPage < totalPages && (currentPage++)" 
+              :disabled="currentPage === totalPages"
+              class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none transition text-sm font-medium shadow-sm"
+            >
+              Siguiente ▶
+            </button>
+          </div>
+          <div class="flex items-center gap-2 text-sm text-slate-600 font-medium">
+            Filas por página:
+            <select v-model="pageSize" class="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-slate-700 font-semibold shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20">
+              <option :value="5">5</option>
+              <option :value="10">10</option>
+              <option :value="20">20</option>
+              <option :value="50">50</option>
+            </select>
+          </div>
         </div>
         <div v-else-if="loadingInventory" style="text-align: center; padding: 2rem; color: var(--text-muted);">
           Cargando inventario consolidado...
@@ -368,6 +410,40 @@ export default {
     const loadingInventory = ref(false)
     const filtroUbicacion = ref('todos')
     const filtrosTipos = ref(["🔌 Switch", "🔋 UPS", "📶 Access Point", "📷 Cámara IP"])
+
+    // Pagination State
+    const currentPage = ref(1)
+    const pageSize = ref(10)
+
+    const totalPages = computed(() => Math.ceil(filteredInventory.value.length / pageSize.value) || 1)
+
+    const paginatedInventory = computed(() => {
+      const start = (currentPage.value - 1) * pageSize.value
+      const end = start + pageSize.value
+      return filteredInventory.value.slice(start, end)
+    })
+
+    const visiblePages = computed(() => {
+      const pages = []
+      const maxVisible = 5
+      let start = Math.max(1, currentPage.value - 2)
+      let end = Math.min(totalPages.value, start + maxVisible - 1)
+      if (end - start + 1 < maxVisible) {
+        start = Math.max(1, end - maxVisible + 1)
+      }
+      for (let i = start; i <= end; i++) {
+        pages.push(i)
+      }
+      return pages
+    })
+
+    watch([filtroUbicacion, filtrosTipos], () => {
+      currentPage.value = 1
+    }, { deep: true })
+
+    watch(activeTab, () => {
+      currentPage.value = 1
+    })
     const tiposEquipos = ["🔌 Switch", "🔋 UPS", "📶 Access Point", "📷 Cámara IP", "⚙️ Host Industrial"]
 
     // Consumibles State
@@ -728,6 +804,11 @@ export default {
       insumosForm,
       submittingInsumo,
       filteredInventory,
+      paginatedInventory,
+      currentPage,
+      pageSize,
+      totalPages,
+      visiblePages,
       equiposDeposito,
       destinosFiltrados,
       consumiblesDisponibles,

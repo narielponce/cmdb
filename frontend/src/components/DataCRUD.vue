@@ -1,26 +1,5 @@
 <template>
   <div class="crud-panel-container">
-    <!-- CRUD Grouped Tabs (No Scroll) -->
-    <div class="tabs-groups-container" style="display: flex; flex-direction: column; gap: 0.8rem; margin-bottom: 2rem; border-bottom: 1px solid var(--panel-border); padding-bottom: 1rem;">
-      <div v-for="group in tabGroups" :key="group.name" style="display: flex; flex-wrap: wrap; align-items: center; gap: 1rem;">
-        <span style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); width: 180px; font-weight: 700; text-align: left;">
-          {{ group.name }}
-        </span>
-        <div style="display: flex; flex-wrap: wrap; gap: 0.4rem; flex: 1;">
-          <button 
-            v-for="tab in group.tabs" 
-            :key="tab.id" 
-            class="tab-btn" 
-            :class="{ active: activeTab === tab.id }"
-            @click="activeTab = tab.id"
-            style="padding: 0.35rem 0.75rem; font-size: 0.82rem;"
-          >
-            {{ tab.label }}
-          </button>
-        </div>
-      </div>
-    </div>
-
     <!-- Active Grid Panel -->
     <div class="glass-panel">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
@@ -149,7 +128,7 @@
           </thead>
           
           <tbody>
-            <tr v-for="(item, idx) in items" :key="item.id || idx">
+            <tr v-for="(item, idx) in paginatedItems" :key="item.id || idx">
               <!-- SUBESTACIONES -->
               <template v-if="activeTab === 'subestaciones'">
                 <td><input type="text" class="editable-cell" v-model="item.nombre" /></td>
@@ -358,6 +337,48 @@
           </tbody>
         </table>
       </div>
+
+      <!-- Controles de Paginación -->
+      <div v-if="items.length > 0" class="flex flex-col sm:flex-row justify-between items-center gap-4 mt-4 bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm">
+        <div class="text-sm text-slate-600 font-medium">
+          Mostrando {{ (currentPage - 1) * pageSize + 1 }} - {{ Math.min(currentPage * pageSize, items.length) }} de {{ items.length }} registros
+        </div>
+        <div class="flex items-center gap-1">
+          <button 
+            @click="currentPage > 1 && (currentPage--)" 
+            :disabled="currentPage === 1"
+            class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none transition text-sm font-medium shadow-sm"
+          >
+            ◀ Anterior
+          </button>
+          
+          <button 
+            v-for="p in visiblePages" 
+            :key="p"
+            @click="currentPage = p"
+            :class="['px-3 py-1.5 rounded-lg text-sm font-semibold transition shadow-sm', p === currentPage ? 'bg-primary text-white' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50']"
+          >
+            {{ p }}
+          </button>
+
+          <button 
+            @click="currentPage < totalPages && (currentPage++)" 
+            :disabled="currentPage === totalPages"
+            class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none transition text-sm font-medium shadow-sm"
+          >
+            Siguiente ▶
+          </button>
+        </div>
+        <div class="flex items-center gap-2 text-sm text-slate-600 font-medium">
+          Filas por página:
+          <select v-model="pageSize" class="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-slate-700 font-semibold shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20">
+            <option :value="5">5</option>
+            <option :value="10">10</option>
+            <option :value="20">20</option>
+            <option :value="50">50</option>
+          </select>
+        </div>
+      </div>
     </div>
 
     <!-- Modal for Unified Host Creation -->
@@ -514,11 +535,44 @@ import axios from 'axios'
 
 export default {
   name: 'DataCRUD',
-  setup() {
-    const activeTab = ref('subestaciones')
+  props: {
+    activeTabProp: {
+      type: String,
+      default: 'subestaciones'
+    }
+  },
+  emits: ['update-tab'],
+  setup(props, { emit }) {
+    const activeTab = ref(props.activeTabProp || 'subestaciones')
     const items = ref([])
     const loading = ref(false)
     const canWrite = ref(false)
+
+    // Pagination State
+    const currentPage = ref(1)
+    const pageSize = ref(10)
+
+    const totalPages = computed(() => Math.ceil(items.value.length / pageSize.value) || 1)
+
+    const paginatedItems = computed(() => {
+      const start = (currentPage.value - 1) * pageSize.value
+      const end = start + pageSize.value
+      return items.value.slice(start, end)
+    })
+
+    const visiblePages = computed(() => {
+      const pages = []
+      const maxVisible = 5
+      let start = Math.max(1, currentPage.value - 2)
+      let end = Math.min(totalPages.value, start + maxVisible - 1)
+      if (end - start + 1 < maxVisible) {
+        start = Math.max(1, end - maxVisible + 1)
+      }
+      for (let i = start; i <= end; i++) {
+        pages.push(i)
+      }
+      return pages
+    })
 
     const loadUserPermissions = () => {
       const savedUser = localStorage.getItem('net_cmdb_user')
@@ -745,6 +799,7 @@ export default {
       
       // Prepend to items list
       items.value.unshift(defaultObj)
+      currentPage.value = 1
     }
 
     const guardarFila = async (item) => {
@@ -765,10 +820,13 @@ export default {
       }
     }
 
-    const eliminarFila = async (item, idx) => {
+    const eliminarFila = async (item) => {
       if (!item.id) {
         // Just remove unsaved row from visual list
-        items.value.splice(idx, 1)
+        const actualIdx = items.value.indexOf(item)
+        if (actualIdx !== -1) {
+          items.value.splice(actualIdx, 1)
+        }
         return
       }
 
@@ -777,15 +835,26 @@ export default {
       try {
         await axios.delete(`/api/${activeTab.value}/${item.id}`)
         alert("✨ Registro eliminado.")
-        items.value.splice(idx, 1)
+        const actualIdx = items.value.indexOf(item)
+        if (actualIdx !== -1) {
+          items.value.splice(actualIdx, 1)
+        }
       } catch (error) {
         console.error("Error deleting row", error)
         alert("Error al eliminar la fila de la base de datos.")
       }
     }
 
-    watch(activeTab, () => {
+    watch(activeTab, (newVal) => {
+      emit('update-tab', newVal)
+      currentPage.value = 1
       fetchData()
+    })
+
+    watch(() => props.activeTabProp, (newVal) => {
+      if (newVal && newVal !== activeTab.value) {
+        activeTab.value = newVal
+      }
     })
 
     onMounted(() => {
@@ -903,6 +972,11 @@ export default {
       tabGroups,
       activeTabLabel,
       items,
+      paginatedItems,
+      currentPage,
+      pageSize,
+      totalPages,
+      visiblePages,
       loading,
       canWrite,
       subestaciones,

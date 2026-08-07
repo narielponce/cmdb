@@ -76,8 +76,35 @@
                 @click.prevent="switchView('crud')"
               >
                 <span class="nav-icon">📝</span>
-                <span>Carga de Datos (CRUD)</span>
+                <span>Carga de Datos</span>
               </a>
+              
+              <!-- Submenú de Carga de Datos -->
+              <ul v-if="currentView === 'crud'" class="pl-6 mt-1 space-y-1 bg-slate-50/50 rounded-lg p-2 border border-slate-100/50">
+                <li v-for="group in tabGroups" :key="group.name" class="mb-1">
+                  <!-- Cabecera de Categoría Colapsable -->
+                  <button
+                    @click.prevent="toggleGroup(group.name)"
+                    class="w-full flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-wider py-1.5 px-2 hover:text-slate-700 hover:bg-slate-100/50 rounded transition text-left"
+                  >
+                    <span>{{ group.name }}</span>
+                    <span style="font-size: 8px; font-weight: normal; margin-left: 4px;">{{ expandedGroups[group.name] ? '▼' : '▶' }}</span>
+                  </button>
+                  
+                  <!-- Listado de Sub-pestañas -->
+                  <ul v-show="expandedGroups[group.name]" class="space-y-0.5 mt-1 pl-2 border-l border-slate-200">
+                    <li v-for="tab in group.tabs" :key="tab.id">
+                      <a
+                        href="#"
+                        @click.prevent="setCrudTab(tab.id, group.name)"
+                        :class="['block text-xs py-1 px-2 rounded-md transition font-medium', activeCrudTab === tab.id ? 'bg-primary/10 text-primary font-semibold' : 'text-slate-600 hover:bg-slate-100']"
+                      >
+                        {{ tab.label }}
+                      </a>
+                    </li>
+                  </ul>
+                </li>
+              </ul>
             </li>
             <li v-if="currentUser.is_superadmin || hasModule('usuarios_roles')">
               <a 
@@ -103,7 +130,11 @@
 
         <!-- Views -->
         <KeepAlive>
-          <component :is="activeComponent" />
+          <component 
+            :is="activeComponent" 
+            :active-tab-prop="activeCrudTab" 
+            @update-tab="updateActiveCrudTab" 
+          />
         </KeepAlive>
       </main>
     </div>
@@ -186,6 +217,66 @@ export default {
       currentView.value = 'dashboard'
     }
 
+    const activeCrudTab = ref('subestaciones')
+
+    const expandedGroups = ref({
+      'CMDB & Activos': true,
+      'Software & Procesos': false,
+      'Tablas de Soporte': false
+    })
+
+    const toggleGroup = (groupName) => {
+      expandedGroups.value[groupName] = !expandedGroups.value[groupName]
+    }
+
+    const updateActiveCrudTab = (tabId) => {
+      activeCrudTab.value = tabId
+      const parentGroup = tabGroups.find(g => g.tabs.some(t => t.id === tabId))
+      if (parentGroup) {
+        expandedGroups.value[parentGroup.name] = true
+      }
+    }
+
+    const setCrudTab = (tabId, groupName) => {
+      activeCrudTab.value = tabId
+      currentView.value = 'crud'
+      if (groupName) {
+        expandedGroups.value[groupName] = true
+      }
+    }
+
+    const tabGroups = [
+      {
+        name: "CMDB & Activos",
+        tabs: [
+          { id: 'subestaciones', label: 'Subestaciones' },
+          { id: 'blindobarras', label: 'Blindobarras' },
+          { id: 'racks', label: 'Racks' },
+          { id: 'ups', label: 'UPS' },
+          { id: 'switches', label: 'Switches' },
+          { id: 'hosts', label: 'Hosts' },
+          { id: 'servidores', label: 'Servidores' }
+        ]
+      },
+      {
+        name: "Software & Procesos",
+        tabs: [
+          { id: 'aplicaciones', label: 'Aplicaciones' },
+          { id: 'dependencias', label: 'Dependencias App-Srv' },
+          { id: 'procesos', label: 'Procesos Planta' }
+        ]
+      },
+      {
+        name: "Tablas de Soporte",
+        tabs: [
+          { id: 'marcas', label: 'Marcas' },
+          { id: 'estados', label: 'Estados' },
+          { id: 'tipos-host', label: 'Tipos Host' },
+          { id: 'tipos-servidor', label: 'Tipos Servidor' }
+        ]
+      }
+    ]
+
     const switchView = (view) => {
       if (hasModule(view) || (view === 'usuarios_roles' && currentUser.value.is_superadmin)) {
         currentView.value = view
@@ -208,7 +299,7 @@ export default {
         case 'dashboard': return 'Panel de Inicio'
         case 'simulator': return 'Simulador de Impacto'
         case 'itam': return 'Gestión de Depósito e ITAM'
-        case 'crud': return 'Panel de Gestión de Datos (CRUD)'
+        case 'crud': return 'Panel de Gestión de Datos'
         case 'usuarios_roles': return 'Seguridad y Accesos'
         default: return 'Panel de Inicio'
       }
@@ -262,7 +353,13 @@ export default {
       hasModule,
       onLoginSuccess,
       handleLogout,
-      switchView
+      switchView,
+      activeCrudTab,
+      updateActiveCrudTab,
+      setCrudTab,
+      tabGroups,
+      expandedGroups,
+      toggleGroup
     }
   }
 }
