@@ -132,6 +132,51 @@ def check_global_permission(request: Request, db: Session = Depends(get_db)):
     method = request.method
     is_write = method in ["POST", "PUT", "DELETE"]
     
+    # Permitir lectura (GET) de entidades de configuración e infraestructura a usuarios
+    # que tengan acceso de lectura en crud, simulator o itam.
+    shared_read_endpoints = [
+        "/api/subestaciones",
+        "/api/blindobarras",
+        "/api/ups",
+        "/api/racks",
+        "/api/switches",
+        "/api/hosts",
+        "/api/servidores",
+        "/api/aplicaciones",
+        "/api/dependencias",
+        "/api/procesos",
+        "/api/planos",
+        "/api/marcas",
+        "/api/estados",
+        "/api/tipos-host",
+        "/api/tipos-servidor"
+    ]
+    
+    is_shared_read = False
+    if method == "GET":
+        for endpoint in shared_read_endpoints:
+            if path.startswith(endpoint):
+                is_shared_read = True
+                break
+
+    if is_shared_read:
+        if not user.role:
+            raise HTTPException(status_code=403, detail="El usuario no tiene un rol asignado")
+        
+        has_permission = db.query(models.RoleModule).filter(
+            models.RoleModule.role_id == user.role_id,
+            models.RoleModule.module_name.in_(["crud", "simulator", "itam"]),
+            models.RoleModule.can_read == True
+        ).first() is not None
+        
+        if has_permission:
+            return user
+        else:
+            raise HTTPException(
+                status_code=403, 
+                detail="No tiene permisos de lectura para acceder a estos datos de infraestructura"
+            )
+
     if path.startswith("/api/inventario") or path.startswith("/api/consumibles"):
         module_name = "itam"
     elif path.startswith("/api/simulator"):
