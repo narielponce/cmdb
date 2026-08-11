@@ -3,6 +3,18 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .database import Base
 
+class Plano(Base):
+    __tablename__ = "planos"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String, unique=True, nullable=False)
+    imagen_url = Column(String, nullable=True)
+    ancho = Column(Integer, default=800)
+    alto = Column(Integer, default=600)
+    
+    hosts = relationship("Host", back_populates="plano", foreign_keys="Host.plano_id")
+    racks = relationship("Rack", back_populates="plano", foreign_keys="Rack.plano_id")
+
 class Marca(Base):
     __tablename__ = "marcas"
     
@@ -72,6 +84,11 @@ class Host(Base):
     puerto_switch = Column(String, default="")
     blindobarra_id = Column(Integer, ForeignKey("blindobarras.id", ondelete="SET NULL"), nullable=True)
     
+    # Plano positioning fields
+    plano_id = Column(Integer, ForeignKey("planos.id", ondelete="SET NULL"), nullable=True)
+    plano_x = Column(Float, nullable=True)
+    plano_y = Column(Float, nullable=True)
+    
     # Specific fields
     capacidad_kva = Column(Float, nullable=True) # for UPS
     fecha_fabricacion = Column(Date, nullable=True) # for UPS
@@ -87,6 +104,7 @@ class Host(Base):
     tipo_servidor = relationship("TipoServidor")
     rack = relationship("Rack", back_populates="hosts", foreign_keys=[rack_id])
     blindobarra = relationship("Blindobarra", back_populates="hosts")
+    plano = relationship("Plano", back_populates="hosts", foreign_keys=[plano_id])
     
     # Self referential switch connection
     switch = relationship("Host", remote_side=[id], backref="hosts_conectados", foreign_keys=[switch_id])
@@ -101,9 +119,15 @@ class Rack(Base):
     nombre = Column(String, unique=True, nullable=False)
     ups_id = Column(Integer, ForeignKey("hosts.id", ondelete="CASCADE"), nullable=False)
     
+    # Plano positioning fields
+    plano_id = Column(Integer, ForeignKey("planos.id", ondelete="SET NULL"), nullable=True)
+    plano_x = Column(Float, nullable=True)
+    plano_y = Column(Float, nullable=True)
+    
     # A rack is fed by a Host (which must be a UPS)
     ups = relationship("Host", foreign_keys=[ups_id])
     hosts = relationship("Host", back_populates="rack", foreign_keys=[Host.rack_id])
+    plano = relationship("Plano", back_populates="racks", foreign_keys=[plano_id])
 
 class Aplicacion(Base):
     __tablename__ = "aplicaciones"

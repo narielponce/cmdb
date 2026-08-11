@@ -64,6 +64,17 @@
                 <span>Depósito e ITAM</span>
               </a>
             </li>
+            <li v-if="hasModule('crud')">
+              <a 
+                href="#" 
+                class="nav-item" 
+                :class="{ active: currentView === 'planos' }"
+                @click.prevent="switchView('planos')"
+              >
+                <span class="nav-icon">🗺️</span>
+                <span>Planos e Infraestructura</span>
+              </a>
+            </li>
           </ul>
 
           <div class="sidebar-category" v-if="hasModule('crud') || currentUser.is_superadmin || hasModule('usuarios_roles')">Administración</div>
@@ -155,6 +166,7 @@ import ITAMPanel from './components/ITAMPanel.vue'
 import DataCRUD from './components/DataCRUD.vue'
 import UsuariosRoles from './components/UsuariosRoles.vue'
 import Login from './components/Login.vue'
+import PlanosPanel from './components/PlanosPanel.vue'
 
 // Set up axios interceptor for 401s globally
 axios.interceptors.response.use(
@@ -178,7 +190,8 @@ export default {
     ITAMPanel,
     DataCRUD,
     UsuariosRoles,
-    Login
+    Login,
+    PlanosPanel
   },
   setup() {
     const currentView = ref('dashboard')
@@ -278,7 +291,11 @@ export default {
     ]
 
     const switchView = (view) => {
-      if (hasModule(view) || (view === 'usuarios_roles' && currentUser.value.is_superadmin)) {
+      if (view === 'planos') {
+        if (hasModule('crud')) {
+          currentView.value = 'planos'
+        }
+      } else if (hasModule(view) || (view === 'usuarios_roles' && currentUser.value.is_superadmin)) {
         currentView.value = view
       }
     }
@@ -290,6 +307,7 @@ export default {
         case 'itam': return 'ITAMPanel'
         case 'crud': return 'DataCRUD'
         case 'usuarios_roles': return 'UsuariosRoles'
+        case 'planos': return 'PlanosPanel'
         default: return 'Dashboard'
       }
     })
@@ -301,6 +319,7 @@ export default {
         case 'itam': return 'Gestión de Depósito e ITAM'
         case 'crud': return 'Panel de Gestión de Datos'
         case 'usuarios_roles': return 'Seguridad y Accesos'
+        case 'planos': return 'Planos e Infraestructura'
         default: return 'Panel de Inicio'
       }
     })
@@ -312,6 +331,7 @@ export default {
         case 'itam': return 'Control de stock físico de equipos de red, energía y cables de planta'
         case 'crud': return 'Carga, edición y eliminación de elementos y dependencias lógicas'
         case 'usuarios_roles': return 'Matriz de permisos, gestión de roles y cuentas de usuario del sistema'
+        case 'planos': return 'Mapeo Drag & Drop de activos e infraestructura en planos de planta'
         default: return ''
       }
     })

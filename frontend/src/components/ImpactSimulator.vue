@@ -86,6 +86,116 @@
         <span class="pulse-indicator">● EN SIMULACIÓN</span>
       </div>
 
+      <!-- Plano de Planta Visualizer -->
+      <div class="glass-panel" style="margin-top: 1.5rem;">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+          <div>
+            <h3 style="font-size: 1.15rem; margin-bottom: 0.25rem; font-weight: bold; color: var(--text-title);">🗺️ Equipos Afectados en Plano de Planta</h3>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0;">Visualiza la distribución física y los equipos caídos (resaltados en rojo pulsante con advertencia).</p>
+          </div>
+          
+          <!-- Plano selector -->
+          <div class="flex items-center gap-2">
+            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Seleccionar Plano:</label>
+            <select v-model="selectedPlanoId" @change="onPlanoChange" class="form-select text-xs" style="width: auto; min-width: 200px; height: 34px;">
+              <option :value="null">-- Seleccionar Plano --</option>
+              <option v-for="p in planos" :key="p.id" :value="p.id">{{ p.nombre }}</option>
+            </select>
+          </div>
+        </div>
+
+        <div v-if="!selectedPlanoId" class="text-center py-10 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-sm text-slate-500">
+          Seleccione un plano de planta para visualizar gráficamente los equipos afectados.
+        </div>
+        <div v-else-if="loadingPlanoItems" class="text-center py-10 text-sm text-slate-500">
+          Cargando mapa y distribución de equipos...
+        </div>
+        <div v-else class="flex flex-col items-center">
+          <!-- Canvas Wrapper -->
+          <div 
+            class="canvas-wrapper relative border border-slate-200 rounded-xl overflow-auto bg-slate-900 shadow-inner flex items-center justify-center w-full"
+            style="min-height: 500px; height: 500px;"
+          >
+            <div v-if="!currentPlano || !currentPlano.imagen_url" class="text-white text-sm">
+              El plano seleccionado no tiene una imagen cargada.
+            </div>
+            <div 
+              v-else
+              class="plano-map-canvas relative shadow-lg bg-cover bg-no-repeat bg-center"
+              :style="{ 
+                width: currentPlano.ancho + 'px', 
+                height: currentPlano.alto + 'px',
+                backgroundImage: 'url(' + currentPlano.imagen_url + ')',
+                minWidth: currentPlano.ancho + 'px',
+                minHeight: currentPlano.alto + 'px'
+              }"
+            >
+              <!-- Connectors SVG Overlay -->
+              <svg 
+                class="absolute inset-0 pointer-events-none w-full h-full"
+                :style="{ 
+                  width: currentPlano.ancho + 'px', 
+                  height: currentPlano.alto + 'px',
+                  minWidth: currentPlano.ancho + 'px',
+                  minHeight: currentPlano.alto + 'px'
+                }"
+              >
+                <line 
+                  v-for="line in connectorLines" 
+                  :key="line.id"
+                  :x1="line.x1" 
+                  :y1="line.y1" 
+                  :x2="line.x2" 
+                  :y2="line.y2" 
+                  :stroke="line.color" 
+                  :stroke-width="line.width"
+                  :stroke-dasharray="line.dasharray"
+                  :class="['connector-line-transition', line.isAffected ? 'connector-line-affected' : '']"
+                />
+              </svg>
+              <!-- Render positioned items -->
+              <div 
+                v-for="item in planoItems" 
+                :key="item.type + '-' + item.id"
+                class="absolute select-none flex items-center justify-center"
+                :style="{ 
+                  left: (item.x - 20) + 'px', 
+                  top: (item.y - 20) + 'px',
+                  width: '40px',
+                  height: '40px'
+                }"
+              >
+                <!-- Badge Pin, flashes red if isItemAffected -->
+                <div 
+                  :class="[
+                    'w-10 h-10 rounded-full flex items-center justify-center text-lg shadow-lg border-2 ring-4 transition transform hover:scale-110 duration-200', 
+                    isItemAffected(item) ? 'bg-red-500 text-white border-red-200 ring-red-500/30 affected-pulsing' : getTypeColorClass(item.tipo),
+                    isItemAffected(item) ? '' : 'ring-slate-900/10'
+                  ]"
+                  :title="item.nombre + ' (' + item.tipo + ') - ' + (isItemAffected(item) ? '🔴 AFECTADO (INOPERATIVO)' : '🟢 OPERATIVO')"
+                >
+                  {{ isItemAffected(item) ? '⚠️' : getTypeIcon(item.tipo) }}
+                </div>
+                
+                <!-- Floating label -->
+                <span class="absolute top-11 bg-slate-950/80 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow whitespace-nowrap pointer-events-none select-none max-w-[100px] truncate">
+                  {{ item.nombre }}
+                </span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="mt-4 flex flex-wrap gap-4 justify-center text-xs text-slate-500">
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-red-500 inline-block affected-pulsing-legend"></span> Equipo Afectado (Sin Alimentación / Caído)</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-amber-500 border border-amber-600 inline-block"></span> 🔋 UPS</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-violet-600 border border-violet-700 inline-block"></span> 🔌 Switch</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-blue-600 border border-blue-700 inline-block"></span> 🗄️ Rack</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-rose-500 border border-rose-600 inline-block"></span> 🖥️ Servidor</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-emerald-600 border border-emerald-700 inline-block"></span> 🛰️ Host</span>
+          </div>
+        </div>
+      </div>
+
       <div class="results-dashboard-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem; margin-top: 1.5rem;">
         
         <!-- Blindobarras -->
@@ -348,8 +458,170 @@ export default {
       }
     }
 
-    onMounted(() => {
-      cargarEntidades()
+    // Planos integration state
+    const planos = ref([])
+    const selectedPlanoId = ref(null)
+    const planoItems = ref([])
+    const loadingPlanoItems = ref(false)
+
+    const currentPlano = computed(() => {
+      return planos.value.find(p => p.id === selectedPlanoId.value) || null
+    })
+
+    const fetchPlanos = async () => {
+      try {
+        const res = await axios.get('/api/planos')
+        planos.value = res.data
+        if (planos.value.length > 0) {
+          selectedPlanoId.value = planos.value[0].id
+          await fetchPlanoItems(planos.value[0].id)
+        }
+      } catch (err) {
+        console.error("Error loading planos in simulator", err)
+      }
+    }
+
+    const fetchPlanoItems = async (planoId) => {
+      if (!planoId) {
+        planoItems.value = []
+        return
+      }
+      loadingPlanoItems.value = true
+      try {
+        const res = await axios.get(`/api/planos/${planoId}/items`)
+        planoItems.value = [
+          ...res.data.placed_hosts,
+          ...res.data.placed_racks
+        ]
+      } catch (err) {
+        console.error("Error loading plano items in simulator", err)
+      } finally {
+        loadingPlanoItems.value = false
+      }
+    }
+
+    const onPlanoChange = async () => {
+      await fetchPlanoItems(selectedPlanoId.value)
+    }
+
+    const isItemAffected = (item) => {
+      if (!resultados.value) return false
+      
+      if (item.tipo === 'Rack') {
+        return resultados.value.racks?.some(r => r.id === item.id)
+      } else if (item.tipo === 'UPS') {
+        return resultados.value.ups?.some(u => u.id === item.id)
+      } else if (item.tipo === 'Switch') {
+        return resultados.value.switches?.some(s => s.id === item.id)
+      } else if (item.tipo === 'Servidor') {
+        return resultados.value.servidores?.some(s => s.id === item.id)
+      } else {
+        // Generic host
+        return resultados.value.hosts?.some(h => h.id === item.id)
+      }
+    }
+
+    // Helper formatting functions
+    const getTypeIcon = (tipo) => {
+      switch (tipo) {
+        case 'UPS': return '🔋'
+        case 'Switch': return '🔌'
+        case 'Rack': return '🗄️'
+        case 'Servidor': return '🖥️'
+        default: return '🛰️'
+      }
+    }
+
+    const getTypeColorClass = (tipo) => {
+      switch (tipo) {
+        case 'UPS': return 'bg-amber-500 text-white border-amber-600 shadow-lg shadow-amber-500/20'
+        case 'Switch': return 'bg-violet-600 text-white border-violet-700 shadow-lg shadow-violet-500/20'
+        case 'Rack': return 'bg-blue-600 text-white border-blue-700 shadow-lg shadow-blue-500/20'
+        case 'Servidor': return 'bg-rose-500 text-white border-rose-600 shadow-lg shadow-rose-500/20'
+        default: return 'bg-emerald-600 text-white border-emerald-700 shadow-lg shadow-emerald-500/20'
+      }
+    }
+
+    const connectorLines = computed(() => {
+      const lines = []
+      const items = planoItems.value
+      if (!items || items.length === 0) return lines
+
+      const findItem = (tipo, id) => {
+        return items.find(item => {
+          if (tipo === 'Rack') {
+            return item.tipo === 'Rack' && item.id === id
+          } else {
+            return item.tipo === tipo && item.id === id
+          }
+        })
+      }
+
+      items.forEach(item => {
+        // 1. Rack -> UPS
+        if (item.tipo === 'Rack' && item.ups_id) {
+          const upsItem = findItem('UPS', item.ups_id)
+          if (upsItem) {
+            const affected = isItemAffected(item) || isItemAffected(upsItem)
+            lines.push({
+              id: `rack-ups-${item.id}-${upsItem.id}`,
+              x1: item.x,
+              y1: item.y,
+              x2: upsItem.x,
+              y2: upsItem.y,
+              color: affected ? '#ef4444' : '#10b981',
+              width: affected ? 3 : 2,
+              dasharray: affected ? '6,4' : null,
+              isAffected: affected
+            })
+          }
+        }
+
+        // 2. Switch -> Rack
+        if (item.tipo === 'Switch' && item.rack_id) {
+          const rackItem = findItem('Rack', item.rack_id)
+          if (rackItem) {
+            const affected = isItemAffected(item) || isItemAffected(rackItem)
+            lines.push({
+              id: `switch-rack-${item.id}-${rackItem.id}`,
+              x1: item.x,
+              y1: item.y,
+              x2: rackItem.x,
+              y2: rackItem.y,
+              color: affected ? '#ef4444' : '#10b981',
+              width: affected ? 3 : 2,
+              dasharray: affected ? '6,4' : null,
+              isAffected: affected
+            })
+          }
+        }
+
+        // 3. Host/Servidor -> Switch
+        if (item.tipo !== 'Switch' && item.tipo !== 'Rack' && item.switch_id) {
+          const switchItem = findItem('Switch', item.switch_id)
+          if (switchItem) {
+            const affected = isItemAffected(item) || isItemAffected(switchItem)
+            lines.push({
+              id: `host-switch-${item.id}-${switchItem.id}`,
+              x1: item.x,
+              y1: item.y,
+              x2: switchItem.x,
+              y2: switchItem.y,
+              color: affected ? '#ef4444' : '#10b981',
+              width: affected ? 3 : 2,
+              dasharray: affected ? '6,4' : null,
+              isAffected: affected
+            })
+          }
+        }
+      })
+
+      return lines
+    })
+
+    onMounted(async () => {
+      await cargarEntidades()
+      await fetchPlanos()
     })
 
     return {
@@ -363,7 +635,17 @@ export default {
       targetNombre,
       selectedServerInfo,
       cargarEntidades,
-      simularImpacto
+      simularImpacto,
+      planos,
+      selectedPlanoId,
+      planoItems,
+      loadingPlanoItems,
+      currentPlano,
+      onPlanoChange,
+      isItemAffected,
+      getTypeIcon,
+      getTypeColorClass,
+      connectorLines
     }
   }
 }
@@ -383,9 +665,35 @@ export default {
   color: var(--warning);
   animation: pulse 1.5s infinite;
 }
+.affected-pulsing {
+  animation: affectedPulse 1s infinite alternate;
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.8);
+}
+.affected-pulsing-legend {
+  animation: legendPulse 1s infinite alternate;
+}
 @keyframes pulse {
   0% { opacity: 0.6; }
   50% { opacity: 1; }
   100% { opacity: 0.6; }
+}
+@keyframes affectedPulse {
+  0% { transform: scale(1); border-color: rgba(239, 68, 68, 0.4); }
+  100% { transform: scale(1.12); border-color: rgba(239, 68, 68, 1); box-shadow: 0 0 25px rgba(239, 68, 68, 1); }
+}
+@keyframes legendPulse {
+  0% { opacity: 0.5; transform: scale(0.9); }
+  100% { opacity: 1; transform: scale(1.1); }
+}
+.connector-line-transition {
+  transition: stroke 0.3s ease, stroke-width 0.3s ease;
+}
+.connector-line-affected {
+  animation: strokeDash 0.8s linear infinite;
+}
+@keyframes strokeDash {
+  to {
+    stroke-dashoffset: -20;
+  }
 }
 </style>

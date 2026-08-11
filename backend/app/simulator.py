@@ -70,7 +70,7 @@ def simular_corte_subestacion(db: Session, subestacion_id: int):
         "ups": [{"id": u.id, "nombre": u.nombre} for u in ups_hosts],
         "racks": [{"id": r.id, "nombre": r.nombre} for r in racks],
         "switches": [{"id": s.id, "nombre": s.nombre, "ip": s.ip} for s in switches],
-        "hosts": [{"nombre": h.nombre, "ip": h.ip, "rol": h.rol, "ubicacion": h.ubicacion} for h in hosts],
+        "hosts": [{"id": h.id, "nombre": h.nombre, "ip": h.ip, "rol": h.rol, "ubicacion": h.ubicacion} for h in hosts],
         "servidores": [{"id": s.id, "nombre": s.nombre, "ip": s.ip} for s in servidores],
         "aplicaciones": [{"id": a.id, "nombre": a.nombre, "descripcion": a.descripcion} for a in aplicaciones],
         "procesos": [
@@ -144,7 +144,7 @@ def simular_corte_blindobarra(db: Session, blindobarra_id: int):
         "ups": [{"id": u.id, "nombre": u.nombre} for u in ups_hosts],
         "racks": [{"id": r.id, "nombre": r.nombre} for r in racks],
         "switches": [{"id": s.id, "nombre": s.nombre, "ip": s.ip} for s in switches],
-        "hosts": [{"nombre": h.nombre, "ip": h.ip, "rol": h.rol, "ubicacion": h.ubicacion} for h in hosts],
+        "hosts": [{"id": h.id, "nombre": h.nombre, "ip": h.ip, "rol": h.rol, "ubicacion": h.ubicacion} for h in hosts],
         "servidores": [{"id": s.id, "nombre": s.nombre, "ip": s.ip} for s in servidores],
         "aplicaciones": [{"id": a.id, "nombre": a.nombre, "descripcion": a.descripcion} for a in aplicaciones],
         "procesos": [
@@ -207,7 +207,7 @@ def simular_corte_ups(db: Session, ups_id: int):
     return {
         "racks": [{"id": r.id, "nombre": r.nombre} for r in racks],
         "switches": [{"id": s.id, "nombre": s.nombre, "ip": s.ip} for s in switches],
-        "hosts": [{"nombre": h.nombre, "ip": h.ip, "rol": h.rol, "ubicacion": h.ubicacion} for h in hosts],
+        "hosts": [{"id": h.id, "nombre": h.nombre, "ip": h.ip, "rol": h.rol, "ubicacion": h.ubicacion} for h in hosts],
         "servidores": [{"id": s.id, "nombre": s.nombre, "ip": s.ip} for s in servidores],
         "aplicaciones": [{"id": a.id, "nombre": a.nombre, "descripcion": a.descripcion} for a in aplicaciones],
         "procesos": [
@@ -259,7 +259,7 @@ def simular_corte_rack(db: Session, rack_id: int):
         
     return {
         "switches": [{"id": s.id, "nombre": s.nombre, "ip": s.ip} for s in switches],
-        "hosts": [{"nombre": h.nombre, "ip": h.ip, "rol": h.rol, "ubicacion": h.ubicacion} for h in hosts],
+        "hosts": [{"id": h.id, "nombre": h.nombre, "ip": h.ip, "rol": h.rol, "ubicacion": h.ubicacion} for h in hosts],
         "servidores": [{"id": s.id, "nombre": s.nombre, "ip": s.ip} for s in servidores],
         "aplicaciones": [{"id": a.id, "nombre": a.nombre, "descripcion": a.descripcion} for a in aplicaciones],
         "procesos": [

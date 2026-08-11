@@ -13,6 +13,20 @@ from .database import engine, Base, get_db
 from .config import settings
 from . import models, schemas, crud, simulator, pdf_generator
 
+# Try to run auto-migrations for positioning columns
+with engine.connect() as conn:
+    try:
+        conn.execute(text("ALTER TABLE hosts ADD COLUMN IF NOT EXISTS plano_id INTEGER;"))
+        conn.execute(text("ALTER TABLE hosts ADD COLUMN IF NOT EXISTS plano_x FLOAT;"))
+        conn.execute(text("ALTER TABLE hosts ADD COLUMN IF NOT EXISTS plano_y FLOAT;"))
+        conn.execute(text("ALTER TABLE racks ADD COLUMN IF NOT EXISTS plano_id INTEGER;"))
+        conn.execute(text("ALTER TABLE racks ADD COLUMN IF NOT EXISTS plano_x FLOAT;"))
+        conn.execute(text("ALTER TABLE racks ADD COLUMN IF NOT EXISTS plano_y FLOAT;"))
+        conn.commit()
+        print("🌱 Auto-migration of positioning columns succeeded.")
+    except Exception as e:
+        print(f"Skipping auto-migration columns: {e}")
+
 Base.metadata.create_all(bind=engine)
 
 # ==========================================
@@ -1219,4 +1233,226 @@ def delete_tipo_servidor(id: int, db: Session = Depends(get_db)):
     if not crud.delete_tipo_servidor(db, id):
         raise HTTPException(status_code=404, detail="Tipo Servidor no encontrado")
     return {"message": "Tipo Servidor eliminado correctamente"}
+
+
+# ==========================================
+# ENDPOINTS DE PLANOS e INFRAESTRUCTURA
+# ==========================================
+
+@app.get("/api/planos", response_model=List[schemas.PlanoResponse])
+def get_planos(db: Session = Depends(get_db)):
+    return db.query(models.Plano).order_by(models.Plano.nombre.asc()).all()
+
+@app.get("/api/planos/{id}", response_model=schemas.PlanoResponse)
+def get_plano(id: int, db: Session = Depends(get_db)):
+    plano = db.query(models.Plano).filter(models.Plano.id == id).first()
+    if not plano:
+        raise HTTPException(status_code=404, detail="Plano no encontrado")
+    return plano
+
+@app.post("/api/planos", response_model=schemas.PlanoResponse)
+def create_plano(plano: schemas.PlanoCreate, db: Session = Depends(get_db)):
+    db_plano = models.Plano(**plano.dict())
+    db.add(db_plano)
+    db.commit()
+    db.refresh(db_plano)
+    return db_plano
+
+@app.put("/api/planos/{id}", response_model=schemas.PlanoResponse)
+def update_plano(id: int, plano: schemas.PlanoUpdate, db: Session = Depends(get_db)):
+    db_plano = db.query(models.Plano).filter(models.Plano.id == id).first()
+    if not db_plano:
+        raise HTTPException(status_code=404, detail="Plano no encontrado")
+    for key, val in plano.dict(exclude_unset=True).items():
+        setattr(db_plano, key, val)
+    db.commit()
+    db.refresh(db_plano)
+    return db_plano
+
+@app.delete("/api/planos/{id}", response_model=schemas.Message)
+def delete_plano(id: int, db: Session = Depends(get_db)):
+    db_plano = db.query(models.Plano).filter(models.Plano.id == id).first()
+    if not db_plano:
+        raise HTTPException(status_code=404, detail="Plano no encontrado")
+    
+    # Dissociate hosts and racks
+    db.query(models.Host).filter(models.Host.plano_id == id).update({
+        models.Host.plano_id: None,
+        models.Host.plano_x: None,
+        models.Host.plano_y: None
+    })
+    db.query(models.Rack).filter(models.Rack.plano_id == id).update({
+        models.Rack.plano_id: None,
+        models.Rack.plano_x: None,
+        models.Rack.plano_y: None
+    })
+    
+    db.delete(db_plano)
+    db.commit()
+    return {"message": "Plano eliminado correctamente y equipos desvinculados"}
+
+@app.post("/api/planos/{plano_id}/upload")
+async def upload_plano_imagen(plano_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
+    plano = db.query(models.Plano).filter(models.Plano.id == plano_id).first()
+    if not plano:
+        raise HTTPException(status_code=404, detail="Plano no encontrado")
+        
+    extension = file.filename.split(".")[-1]
+    nombre_archivo = f"plano_{plano_id}.{extension}"
+    ruta_guardado = os.path.join(settings.UPLOAD_DIR, nombre_archivo)
+    with open(ruta_guardado, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    plano.imagen_url = f"/static/{nombre_archivo}"
+    db.commit()
+    db.refresh(plano)
+    return {"message": "Imagen subida exitosamente", "imagen_url": plano.imagen_url}
+
+def serialize_host_for_plano(h):
+    tipo = h.tipo_host.nombre if h.tipo_host else "Host"
+    return {
+        "id": h.id,
+        "nombre": h.nombre,
+        "ip": h.ip,
+        "tipo": tipo,
+        "x": h.plano_x,
+        "y": h.plano_y,
+        "plano_id": h.plano_id,
+        "switch_id": h.switch_id,
+        "rack_id": h.rack_id,
+        "blindobarra_id": h.blindobarra_id
+    }
+
+def serialize_rack_for_plano(r):
+    return {
+        "id": r.id,
+        "nombre": r.nombre,
+        "tipo": "Rack",
+        "x": r.plano_x,
+        "y": r.plano_y,
+        "plano_id": r.plano_id,
+        "ups_id": r.ups_id
+    }
+
+@app.get("/api/planos/{plano_id}/items")
+def get_plano_items(plano_id: int, db: Session = Depends(get_db)):
+    plano = db.query(models.Plano).filter(models.Plano.id == plano_id).first()
+    if not plano:
+        raise HTTPException(status_code=404, detail="Plano no encontrado")
+        
+    # 1. Get all racks placed on this specific plano
+    placed_racks = db.query(models.Rack).filter(models.Rack.plano_id == plano_id).all()
+    racks_map = {r.id: serialize_rack_for_plano(r) for r in placed_racks}
+    
+    all_hosts = db.query(models.Host).all()
+    placed_hosts_map = {}
+    
+    # First pass: explicitly placed hosts on this plano that do NOT have a parent Rack or Switch
+    for h in all_hosts:
+        if h.plano_id == plano_id and h.rack_id is None and h.switch_id is None:
+            placed_hosts_map[h.id] = serialize_host_for_plano(h)
+            
+    # Iteratively resolve placements for this specific plano
+    resolved_any = True
+    iterations = 0
+    while resolved_any and iterations < 10:
+        resolved_any = False
+        iterations += 1
+        for h in all_hosts:
+            if h.id in placed_hosts_map:
+                continue
+                
+            # If parent Rack is placed on this plano, this Host is implicitly placed on this plano
+            if h.rack_id and h.rack_id in racks_map:
+                parent_rack = racks_map[h.rack_id]
+                x = h.plano_x if h.plano_x is not None else (parent_rack["x"] or 100)
+                y = h.plano_y if h.plano_y is not None else ((parent_rack["y"] or 100) + 60)
+                
+                serialized = serialize_host_for_plano(h)
+                serialized["x"] = x
+                serialized["y"] = y
+                serialized["plano_id"] = plano_id
+                placed_hosts_map[h.id] = serialized
+                resolved_any = True
+                
+            # If connected Switch is placed on this plano, this Host is implicitly placed on this plano
+            elif h.switch_id and h.switch_id in placed_hosts_map:
+                parent_switch = placed_hosts_map[h.switch_id]
+                x = h.plano_x if h.plano_x is not None else ((parent_switch["x"] or 100) + 60)
+                y = h.plano_y if h.plano_y is not None else (parent_switch["y"] or 100)
+                
+                serialized = serialize_host_for_plano(h)
+                serialized["x"] = x
+                serialized["y"] = y
+                serialized["plano_id"] = plano_id
+                placed_hosts_map[h.id] = serialized
+                resolved_any = True
+
+    # 2. Find all Racks and Hosts placed on ANY plano to calculate unplaced lists
+    all_racks = db.query(models.Rack).all()
+    placed_rack_ids_any = {r.id for r in all_racks if r.plano_id is not None}
+    
+    placed_host_ids_any = {h.id for h in all_hosts if h.plano_id is not None}
+    
+    resolved_any_global = True
+    iterations_global = 0
+    while resolved_any_global and iterations_global < 10:
+        resolved_any_global = False
+        iterations_global += 1
+        for h in all_hosts:
+            if h.id in placed_host_ids_any:
+                continue
+            if h.rack_id and h.rack_id in placed_rack_ids_any:
+                placed_host_ids_any.add(h.id)
+                resolved_any_global = True
+            elif h.switch_id and h.switch_id in placed_host_ids_any:
+                placed_host_ids_any.add(h.id)
+                resolved_any_global = True
+
+    # Calculate unplaced lists (not placed on ANY plano, either explicitly or implicitly)
+    unplaced_racks = [serialize_rack_for_plano(r) for r in all_racks if r.id not in placed_rack_ids_any]
+    unplaced_hosts = [serialize_host_for_plano(h) for h in all_hosts if h.id not in placed_host_ids_any]
+            
+    return {
+        "placed_hosts": list(placed_hosts_map.values()),
+        "placed_racks": list(racks_map.values()),
+        "unplaced_hosts": unplaced_hosts,
+        "unplaced_racks": unplaced_racks,
+    }
+
+@app.post("/api/planos/{plano_id}/posicionar")
+def posicionar_plano_items(plano_id: int, request: schemas.PlanoPosicionesRequest, db: Session = Depends(get_db)):
+    plano = db.query(models.Plano).filter(models.Plano.id == plano_id).first()
+    if not plano:
+        raise HTTPException(status_code=404, detail="Plano no encontrado")
+        
+    # Update racks positions
+    for r_pos in request.racks:
+        db_rack = db.query(models.Rack).filter(models.Rack.id == r_pos.id).first()
+        if db_rack:
+            if r_pos.x is None or r_pos.y is None:
+                db_rack.plano_id = None
+                db_rack.plano_x = None
+                db_rack.plano_y = None
+            else:
+                db_rack.plano_id = plano_id
+                db_rack.plano_x = r_pos.x
+                db_rack.plano_y = r_pos.y
+                
+    # Update hosts positions
+    for h_pos in request.hosts:
+        db_host = db.query(models.Host).filter(models.Host.id == h_pos.id).first()
+        if db_host:
+            if h_pos.x is None or h_pos.y is None:
+                db_host.plano_id = None
+                db_host.plano_x = None
+                db_host.plano_y = None
+            else:
+                db_host.plano_id = plano_id
+                db_host.plano_x = h_pos.x
+                db_host.plano_y = h_pos.y
+                
+    db.commit()
+    return {"message": "Posiciones guardadas correctamente"}
+
 

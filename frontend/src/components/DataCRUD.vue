@@ -22,6 +22,167 @@
         </button>
       </div>
 
+      <!-- Search and Filter Bar -->
+      <div v-if="items.length > 0 && ['subestaciones', 'blindobarras', 'ups', 'racks', 'switches', 'hosts', 'servidores'].includes(activeTab)" class="flex flex-col md:flex-row gap-4 items-center mb-6 p-4 bg-slate-50 border border-slate-200 rounded-xl shadow-sm">
+        <!-- Text Search -->
+        <div class="w-full md:flex-1 relative">
+          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">🔍</span>
+          <input 
+            type="text" 
+            v-model="searchQuery" 
+            placeholder="Buscar por nombre, modelo, IP, serie..." 
+            class="form-control w-full"
+            style="padding-left: 2.25rem;"
+          />
+          <button 
+            v-if="searchQuery" 
+            @click="searchQuery = ''" 
+            class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 font-bold text-lg font-mono"
+            type="button"
+            style="background: none; border: none; padding: 0; cursor: pointer; line-height: 1;"
+          >
+            &times;
+          </button>
+        </div>
+
+        <!-- Dynamic Filters depending on activeTab -->
+        <div class="flex flex-wrap gap-2 w-full md:w-auto items-center">
+          <!-- Clear Filters Button -->
+          <button 
+            v-if="hasActiveFilters" 
+            @click="clearFilters" 
+            class="px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition text-xs font-semibold shadow-sm cursor-pointer"
+            style="width: auto; height: 38px;"
+          >
+            🧹 Limpiar Filtros
+          </button>
+
+          <!-- Subestación Filter for Blindobarras -->
+          <select 
+            v-if="activeTab === 'blindobarras'" 
+            v-model="filters.subestacion_id" 
+            class="form-select text-xs py-2 h-[38px] rounded-lg border border-slate-300"
+            style="width: auto; min-width: 160px;"
+          >
+            <option :value="null">Todas las Subestaciones</option>
+            <option v-for="se in subestaciones" :key="se.id" :value="se.id">{{ se.nombre }}</option>
+          </select>
+
+          <!-- Blindobarra Filter for UPS -->
+          <select 
+            v-if="activeTab === 'ups'" 
+            v-model="filters.blindobarra_id" 
+            class="form-select text-xs py-2 h-[38px] rounded-lg border border-slate-300"
+            style="width: auto; min-width: 160px;"
+          >
+            <option :value="null">Todas las Blindobarras</option>
+            <option v-for="bb in blindobarras" :key="bb.id" :value="bb.id">{{ bb.nombre }}</option>
+          </select>
+
+          <!-- Brand Filter (UPS, Switches, Hosts, Servidores) -->
+          <select 
+            v-if="['ups', 'switches', 'hosts', 'servidores'].includes(activeTab)" 
+            v-model="filters.marca" 
+            class="form-select text-xs py-2 h-[38px] rounded-lg border border-slate-300"
+            style="width: auto; min-width: 140px;"
+          >
+            <option value="">Todas las Marcas</option>
+            <option v-for="m in marcas" :key="m.id" :value="m.nombre">{{ m.nombre }}</option>
+          </select>
+
+          <!-- Battery Status Filter (UPS) -->
+          <select 
+            v-if="activeTab === 'ups'" 
+            v-model="filters.estado_baterias" 
+            class="form-select text-xs py-2 h-[38px] rounded-lg border border-slate-300"
+            style="width: auto; min-width: 160px;"
+          >
+            <option value="">Todos los Estados Baterías</option>
+            <option value="Ok">Ok</option>
+            <option value="Cambio Requerido">Cambio Requerido</option>
+            <option value="Crítico">Crítico</option>
+            <option value="En Mantenimiento">En Mantenimiento</option>
+          </select>
+
+          <!-- UPS Filter for Racks -->
+          <select 
+            v-if="activeTab === 'racks'" 
+            v-model="filters.ups_id" 
+            class="form-select text-xs py-2 h-[38px] rounded-lg border border-slate-300"
+            style="width: auto; min-width: 160px;"
+          >
+            <option :value="null">Todos los UPS</option>
+            <option v-for="u in ups" :key="u.id" :value="u.id">{{ u.nombre }}</option>
+          </select>
+
+          <!-- Rack Filter for Switches -->
+          <select 
+            v-if="activeTab === 'switches'" 
+            v-model="filters.rack_id" 
+            class="form-select text-xs py-2 h-[38px] rounded-lg border border-slate-300"
+            style="width: auto; min-width: 160px;"
+          >
+            <option :value="null">Todos los Racks</option>
+            <option :value="-1">En Depósito (Ninguno)</option>
+            <option v-for="rk in racks" :key="rk.id" :value="rk.id">{{ rk.nombre }}</option>
+          </select>
+
+          <!-- Switch Filter (Hosts, Servidores) -->
+          <select 
+            v-if="['hosts', 'servidores'].includes(activeTab)" 
+            v-model="filters.switch_id" 
+            class="form-select text-xs py-2 h-[38px] rounded-lg border border-slate-300"
+            style="width: auto; min-width: 160px;"
+          >
+            <option :value="null">Todos los Switches</option>
+            <option :value="-1">En Depósito / Ninguno</option>
+            <option v-for="sw in switches" :key="sw.id" :value="sw.id">{{ sw.nombre }}</option>
+          </select>
+
+          <!-- Rol Filter (Hosts) -->
+          <select 
+            v-if="activeTab === 'hosts'" 
+            v-model="filters.rol" 
+            class="form-select text-xs py-2 h-[38px] rounded-lg border border-slate-300"
+            style="width: auto; min-width: 140px;"
+          >
+            <option value="">Todos los Roles</option>
+            <option v-for="th in tiposHost" :key="th.id" :value="th.nombre">{{ th.nombre }}</option>
+          </select>
+
+          <!-- Server Type Filter (Servidores) -->
+          <select 
+            v-if="activeTab === 'servidores'" 
+            v-model="filters.tipo_servidor" 
+            class="form-select text-xs py-2 h-[38px] rounded-lg border border-slate-300"
+            style="width: auto; min-width: 140px;"
+          >
+            <option value="">Todos los Tipos</option>
+            <option value="Físico">Físico</option>
+            <option value="Virtual (VM)">Virtual (VM)</option>
+            <option value="Contenedor">Contenedor</option>
+            <option value="Otro">Otro</option>
+          </select>
+
+          <!-- OS Filter (Servidores) -->
+          <select 
+            v-if="activeTab === 'servidores'" 
+            v-model="filters.sistema_operativo" 
+            class="form-select text-xs py-2 h-[38px] rounded-lg border border-slate-300"
+            style="width: auto; min-width: 160px;"
+          >
+            <option value="">Todos los SO</option>
+            <option value="Linux RHEL">Linux RHEL</option>
+            <option value="Ubuntu">Ubuntu</option>
+            <option value="Windows Server 2019">Windows Server 2019</option>
+            <option value="Windows Server 2022">Windows Server 2022</option>
+            <option value="Windows Server 2025">Windows Server 2025</option>
+            <option value="VMware ESXi">VMware ESXi</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+      </div>
+
       <div v-if="loading" style="text-align: center; padding: 3rem; color: var(--text-muted);">
         Cargando datos...
       </div>
@@ -44,15 +205,11 @@
             </tr>
             <tr v-else-if="activeTab === 'ups'">
               <th>Nombre UPS</th>
-              <th>Blindobarra Alimentación</th>
+              <th>Conectado a</th>
               <th>Marca</th>
               <th>Modelo</th>
               <th>Nro Serie</th>
-              <th>Capacidad (KVA)</th>
-              <th>Estado Baterías</th>
-              <th>IP Gestión</th>
-              <th>VLAN</th>
-              <th style="width: 100px;">Acciones</th>
+              <th style="width: 120px;">Acciones</th>
             </tr>
             <tr v-else-if="activeTab === 'racks'">
               <th>Nombre Rack</th>
@@ -71,14 +228,12 @@
             </tr>
             <tr v-else-if="activeTab === 'hosts'">
               <th>Hostname</th>
-              <th>Switch Conexión</th>
               <th>Marca</th>
               <th>Modelo</th>
-              <th>Nro Serie</th>
-              <th>IP</th>
+              <th>Conectado a</th>
               <th>Rol</th>
               <th>Ubicación</th>
-              <th style="width: 100px;">Acciones</th>
+              <th style="width: 120px;">Acciones</th>
             </tr>
             <tr v-else-if="activeTab === 'servidores'">
               <th>Nombre Servidor</th>
@@ -128,7 +283,12 @@
           </thead>
           
           <tbody>
-            <tr v-for="(item, idx) in paginatedItems" :key="item.id || idx">
+            <tr v-if="filteredItems.length === 0">
+              <td :colspan="columnCount" style="text-align: center; padding: 3rem; color: var(--text-muted);">
+                🔍 No se encontraron registros que coincidan con la búsqueda o los filtros seleccionados.
+              </td>
+            </tr>
+            <tr v-else v-for="(item, idx) in paginatedItems" :key="item.id || idx">
               <!-- SUBESTACIONES -->
               <template v-if="activeTab === 'subestaciones'">
                 <td><input type="text" class="editable-cell" v-model="item.nombre" /></td>
@@ -151,9 +311,9 @@
               <template v-else-if="activeTab === 'ups'">
                 <td><input type="text" class="editable-cell" v-model="item.nombre" /></td>
                 <td>
-                  <select class="editable-cell" v-model="item.blindobarra_id">
-                    <option v-for="bb in blindobarras" :key="bb.id" :value="bb.id">{{ bb.nombre }}</option>
-                  </select>
+                  <span class="text-slate-500 font-semibold px-2 text-xs">
+                    {{ getBlindobarraNombre(item.blindobarra_id) }}
+                  </span>
                 </td>
                 <td>
                   <select class="editable-cell" v-model="item.marca">
@@ -162,17 +322,6 @@
                 </td>
                 <td><input type="text" class="editable-cell" v-model="item.modelo" /></td>
                 <td><input type="text" class="editable-cell" v-model="item.serial" /></td>
-                <td><input type="number" class="editable-cell" v-model.number="item.capacidad_kva" /></td>
-                <td>
-                  <select class="editable-cell" v-model="item.estado_baterias">
-                    <option value="Ok">Ok</option>
-                    <option value="Cambio Requerido">Cambio Requerido</option>
-                    <option value="Crítico">Crítico</option>
-                    <option value="En Mantenimiento">En Mantenimiento</option>
-                  </select>
-                </td>
-                <td><input type="text" class="editable-cell" v-model="item.ip" /></td>
-                <td><input type="text" class="editable-cell" v-model="item.vlan" /></td>
               </template>
 
               <!-- RACKS -->
@@ -209,19 +358,16 @@
               <template v-else-if="activeTab === 'hosts'">
                 <td><input type="text" class="editable-cell" v-model="item.nombre" /></td>
                 <td>
-                  <select class="editable-cell" v-model="item.switch_id">
-                    <option :value="null">-- Depósito (Ninguno) --</option>
-                    <option v-for="sw in switches" :key="sw.id" :value="sw.id">{{ sw.nombre }}</option>
-                  </select>
-                </td>
-                <td>
                   <select class="editable-cell" v-model="item.marca">
                     <option v-for="m in marcas" :key="m.id" :value="m.nombre">{{ m.nombre }}</option>
                   </select>
                 </td>
                 <td><input type="text" class="editable-cell" v-model="item.modelo" /></td>
-                <td><input type="text" class="editable-cell" v-model="item.serial" /></td>
-                <td><input type="text" class="editable-cell" v-model="item.ip" /></td>
+                <td>
+                  <span class="text-slate-500 font-semibold px-2 text-xs">
+                    {{ getSwitchNombre(item.switch_id) }}
+                  </span>
+                </td>
                 <td>
                   <select class="editable-cell" v-model="item.rol">
                     <option v-for="th in tiposHost" :key="th.id" :value="th.nombre">{{ th.nombre }}</option>
@@ -323,15 +469,26 @@
 
               <!-- ACTIONS -->
               <td>
-                <div class="crud-actions" v-if="canWrite">
-                  <button class="crud-btn" title="Guardar" @click="guardarFila(item)">
-                    💾
+                <div class="crud-actions">
+                  <button 
+                    v-if="activeTab === 'ups' || activeTab === 'hosts'" 
+                    class="crud-btn" 
+                    title="Detalles / Atributos adicionales" 
+                    @click="activeTab === 'ups' ? abrirDetallesUps(item) : abrirDetallesHost(item)"
+                    type="button"
+                  >
+                    🔍
                   </button>
-                  <button class="crud-btn" title="Eliminar" @click="eliminarFila(item, idx)">
-                    🗑️
-                  </button>
+                  <template v-if="canWrite">
+                    <button class="crud-btn" title="Guardar" @click="guardarFila(item)">
+                      💾
+                    </button>
+                    <button class="crud-btn" title="Eliminar" @click="eliminarFila(item, idx)">
+                      🗑️
+                    </button>
+                  </template>
+                  <span v-else-if="activeTab !== 'ups' && activeTab !== 'hosts'" style="font-size: 0.9rem; color: var(--text-muted);" title="Solo Lectura">🔒</span>
                 </div>
-                <span v-else style="font-size: 0.9rem; color: var(--text-muted);" title="Solo Lectura">🔒</span>
               </td>
             </tr>
           </tbody>
@@ -339,9 +496,9 @@
       </div>
 
       <!-- Controles de Paginación -->
-      <div v-if="items.length > 0" class="flex flex-col sm:flex-row justify-between items-center gap-4 mt-4 bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm">
+      <div v-if="filteredItems.length > 0" class="flex flex-col sm:flex-row justify-between items-center gap-4 mt-4 bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm">
         <div class="text-sm text-slate-600 font-medium">
-          Mostrando {{ (currentPage - 1) * pageSize + 1 }} - {{ Math.min(currentPage * pageSize, items.length) }} de {{ items.length }} registros
+          Mostrando {{ (currentPage - 1) * pageSize + 1 }} - {{ Math.min(currentPage * pageSize, filteredItems.length) }} de {{ filteredItems.length }} registros
         </div>
         <div class="flex items-center gap-1">
           <button 
@@ -377,6 +534,108 @@
             <option :value="20">20</option>
             <option :value="50">50</option>
           </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal for Host Extra Details -->
+    <div v-if="showHostModal && selectedHostItem" class="modal-overlay" @click.self="cerrarDetallesHost">
+      <div class="modal-content glass-panel" style="max-width: 500px; width: 90%; margin: 4rem auto; position: relative;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid var(--panel-border); padding-bottom: 0.8rem;">
+          <h3 style="font-size: 1.25rem; margin: 0; color: var(--text-title);">📋 Detalles Adicionales: {{ selectedHostItem.nombre }}</h3>
+          <button @click="cerrarDetallesHost" style="background: none; border: none; font-size: 1.5rem; color: var(--text-muted); cursor: pointer; line-height: 1;">&times;</button>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+          <!-- Switch Conexión -->
+          <div style="grid-column: span 2;">
+            <label class="form-label">Switch Conexión</label>
+            <select class="form-select" v-model="selectedHostItem.switch_id" :disabled="!canWrite">
+              <option :value="null">-- Depósito (Ninguno) --</option>
+              <option v-for="sw in switches" :key="sw.id" :value="sw.id">{{ sw.nombre }}</option>
+            </select>
+          </div>
+
+          <!-- Nro Serie -->
+          <div>
+            <label class="form-label">Nro Serie</label>
+            <input type="text" class="form-input" v-model="selectedHostItem.serial" :disabled="!canWrite" />
+          </div>
+
+          <!-- IP -->
+          <div>
+            <label class="form-label">IP</label>
+            <input type="text" class="form-input" v-model="selectedHostItem.ip" :disabled="!canWrite" />
+          </div>
+
+          <!-- Puerto Switch -->
+          <div>
+            <label class="form-label">Puerto Switch</label>
+            <input type="text" class="form-input" v-model="selectedHostItem.puerto_switch" :disabled="!canWrite" />
+          </div>
+
+          <!-- Sector Planta -->
+          <div>
+            <label class="form-label">Sector Planta</label>
+            <input type="text" class="form-input" v-model="selectedHostItem.sector_planta" :disabled="!canWrite" />
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 1rem; border-top: 1px solid var(--panel-border); padding-top: 1rem;">
+          <button type="button" class="btn btn-primary" style="max-width: 120px;" @click="cerrarDetallesHost">Aceptar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal for UPS Extra Details -->
+    <div v-if="showUpsModal && selectedUpsItem" class="modal-overlay" @click.self="cerrarDetallesUps">
+      <div class="modal-content glass-panel" style="max-width: 500px; width: 90%; margin: 4rem auto; position: relative;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid var(--panel-border); padding-bottom: 0.8rem;">
+          <h3 style="font-size: 1.25rem; margin: 0; color: var(--text-title);">📋 Detalles Adicionales: {{ selectedUpsItem.nombre }}</h3>
+          <button @click="cerrarDetallesUps" style="background: none; border: none; font-size: 1.5rem; color: var(--text-muted); cursor: pointer; line-height: 1;">&times;</button>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+          <!-- Blindobarra Alimentación -->
+          <div style="grid-column: span 2;">
+            <label class="form-label">Blindobarra Alimentación</label>
+            <select class="form-select" v-model="selectedUpsItem.blindobarra_id" :disabled="!canWrite">
+              <option v-for="bb in blindobarras" :key="bb.id" :value="bb.id">{{ bb.nombre }}</option>
+            </select>
+          </div>
+
+          <!-- Capacidad (KVA) -->
+          <div>
+            <label class="form-label">Capacidad (KVA)</label>
+            <input type="number" step="0.1" class="form-input" v-model.number="selectedUpsItem.capacidad_kva" :disabled="!canWrite" />
+          </div>
+
+          <!-- Estado Baterías -->
+          <div>
+            <label class="form-label">Estado Baterías</label>
+            <select class="form-select" v-model="selectedUpsItem.estado_baterias" :disabled="!canWrite">
+              <option value="Ok">Ok</option>
+              <option value="Cambio Requerido">Cambio Requerido</option>
+              <option value="Crítico">Crítico</option>
+              <option value="En Mantenimiento">En Mantenimiento</option>
+            </select>
+          </div>
+
+          <!-- IP Gestión -->
+          <div>
+            <label class="form-label">IP Gestión</label>
+            <input type="text" class="form-input" v-model="selectedUpsItem.ip" :disabled="!canWrite" />
+          </div>
+
+          <!-- VLAN -->
+          <div>
+            <label class="form-label">VLAN</label>
+            <input type="text" class="form-input" v-model="selectedUpsItem.vlan" :disabled="!canWrite" />
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 1rem; border-top: 1px solid var(--panel-border); padding-top: 1rem;">
+          <button type="button" class="btn btn-primary" style="max-width: 120px;" @click="cerrarDetallesUps">Aceptar</button>
         </div>
       </div>
     </div>
@@ -552,12 +811,170 @@ export default {
     const currentPage = ref(1)
     const pageSize = ref(10)
 
-    const totalPages = computed(() => Math.ceil(items.value.length / pageSize.value) || 1)
+    // Search and Filter State
+    const searchQuery = ref('')
+    const filters = ref({
+      subestacion_id: null,
+      blindobarra_id: null,
+      marca: '',
+      estado_baterias: '',
+      ups_id: null,
+      rack_id: null,
+      switch_id: null,
+      rol: '',
+      tipo_servidor: '',
+      sistema_operativo: ''
+    })
+
+    const resetFilters = () => {
+      searchQuery.value = ''
+      filters.value = {
+        subestacion_id: null,
+        blindobarra_id: null,
+        marca: '',
+        estado_baterias: '',
+        ups_id: null,
+        rack_id: null,
+        switch_id: null,
+        rol: '',
+        tipo_servidor: '',
+        sistema_operativo: ''
+      }
+    }
+
+    const clearFilters = () => {
+      resetFilters()
+    }
+
+    const hasActiveFilters = computed(() => {
+      return searchQuery.value !== '' ||
+        filters.value.subestacion_id !== null ||
+        filters.value.blindobarra_id !== null ||
+        filters.value.marca !== '' ||
+        filters.value.estado_baterias !== '' ||
+        filters.value.ups_id !== null ||
+        filters.value.rack_id !== null ||
+        filters.value.switch_id !== null ||
+        filters.value.rol !== '' ||
+        filters.value.tipo_servidor !== '' ||
+        filters.value.sistema_operativo !== ''
+    })
+
+    const filteredItems = computed(() => {
+      let result = items.value
+
+      // Apply search query
+      if (searchQuery.value.trim() !== '') {
+        const query = searchQuery.value.toLowerCase().trim()
+        result = result.filter(item => {
+          const nombreMatch = item.nombre ? item.nombre.toLowerCase().includes(query) : false
+          const modeloMatch = item.modelo ? item.modelo.toLowerCase().includes(query) : false
+          const serialMatch = item.serial ? item.serial.toLowerCase().includes(query) : false
+          const ipMatch = item.ip ? item.ip.toLowerCase().includes(query) : false
+          const ubicacionMatch = item.ubicacion ? item.ubicacion.toLowerCase().includes(query) : false
+          const vlanMatch = item.vlan ? String(item.vlan).toLowerCase().includes(query) : false
+          const vlanGestionMatch = item.vlan_gestion ? String(item.vlan_gestion).toLowerCase().includes(query) : false
+          
+          const nombreProcesoMatch = item.nombre_proceso ? item.nombre_proceso.toLowerCase().includes(query) : false
+          const descripcionMatch = item.descripcion ? item.descripcion.toLowerCase().includes(query) : false
+          const ownerMatch = item.owner_negocio ? item.owner_negocio.toLowerCase().includes(query) : false
+
+          return nombreMatch || modeloMatch || serialMatch || ipMatch || ubicacionMatch || vlanMatch || vlanGestionMatch || nombreProcesoMatch || descripcionMatch || ownerMatch
+        })
+      }
+
+      // Apply dynamic filters depending on activeTab
+      if (activeTab.value === 'blindobarras') {
+        if (filters.value.subestacion_id !== null) {
+          result = result.filter(item => item.subestacion_id === filters.value.subestacion_id)
+        }
+      } else if (activeTab.value === 'ups') {
+        if (filters.value.blindobarra_id !== null) {
+          result = result.filter(item => item.blindobarra_id === filters.value.blindobarra_id)
+        }
+        if (filters.value.marca !== '') {
+          result = result.filter(item => item.marca === filters.value.marca)
+        }
+        if (filters.value.estado_baterias !== '') {
+          result = result.filter(item => item.estado_baterias === filters.value.estado_baterias)
+        }
+      } else if (activeTab.value === 'racks') {
+        if (filters.value.ups_id !== null) {
+          result = result.filter(item => item.ups_id === filters.value.ups_id)
+        }
+      } else if (activeTab.value === 'switches') {
+        if (filters.value.rack_id !== null) {
+          if (filters.value.rack_id === -1) {
+            result = result.filter(item => item.rack_id === null)
+          } else {
+            result = result.filter(item => item.rack_id === filters.value.rack_id)
+          }
+        }
+        if (filters.value.marca !== '') {
+          result = result.filter(item => item.marca === filters.value.marca)
+        }
+      } else if (activeTab.value === 'hosts') {
+        if (filters.value.switch_id !== null) {
+          if (filters.value.switch_id === -1) {
+            result = result.filter(item => item.switch_id === null)
+          } else {
+            result = result.filter(item => item.switch_id === filters.value.switch_id)
+          }
+        }
+        if (filters.value.marca !== '') {
+          result = result.filter(item => item.marca === filters.value.marca)
+        }
+        if (filters.value.rol !== '') {
+          result = result.filter(item => item.rol === filters.value.rol)
+        }
+      } else if (activeTab.value === 'servidores') {
+        if (filters.value.switch_id !== null) {
+          if (filters.value.switch_id === -1) {
+            result = result.filter(item => item.switch_id === null)
+          } else {
+            result = result.filter(item => item.switch_id === filters.value.switch_id)
+          }
+        }
+        if (filters.value.marca !== '') {
+          result = result.filter(item => item.marca === filters.value.marca)
+        }
+        if (filters.value.tipo_servidor !== '') {
+          result = result.filter(item => item.tipo_servidor === filters.value.tipo_servidor)
+        }
+        if (filters.value.sistema_operativo !== '') {
+          result = result.filter(item => item.sistema_operativo === filters.value.sistema_operativo)
+        }
+      }
+
+      return result
+    })
+
+    const columnCount = computed(() => {
+      switch (activeTab.value) {
+        case 'subestaciones': return 4
+        case 'blindobarras': return 4
+        case 'ups': return 6
+        case 'racks': return 3
+        case 'switches': return 8
+        case 'hosts': return 7
+        case 'servidores': return 9
+        case 'aplicaciones': return 4
+        case 'dependencias': return 4
+        case 'procesos': return 4
+        case 'marcas': return 2
+        case 'estados': return 2
+        case 'tipos-host': return 2
+        case 'tipos-servidor': return 2
+        default: return 5
+      }
+    })
+
+    const totalPages = computed(() => Math.ceil(filteredItems.value.length / pageSize.value) || 1)
 
     const paginatedItems = computed(() => {
       const start = (currentPage.value - 1) * pageSize.value
       const end = start + pageSize.value
-      return items.value.slice(start, end)
+      return filteredItems.value.slice(start, end)
     })
 
     const visiblePages = computed(() => {
@@ -847,9 +1264,14 @@ export default {
 
     watch(activeTab, (newVal) => {
       emit('update-tab', newVal)
+      resetFilters()
       currentPage.value = 1
       fetchData()
     })
+
+    watch([searchQuery, filters], () => {
+      currentPage.value = 1
+    }, { deep: true })
 
     watch(() => props.activeTabProp, (newVal) => {
       if (newVal && newVal !== activeTab.value) {
@@ -861,6 +1283,44 @@ export default {
       loadUserPermissions()
       fetchData()
     })
+
+    // Modal Host details state
+    const showHostModal = ref(false)
+    const selectedHostItem = ref(null)
+
+    const abrirDetallesHost = (item) => {
+      selectedHostItem.value = item
+      showHostModal.value = true
+    }
+
+    const cerrarDetallesHost = () => {
+      showHostModal.value = false
+      selectedHostItem.value = null
+    }
+
+    const getSwitchNombre = (id) => {
+      const sw = switches.value.find(s => s.id === id)
+      return sw ? sw.nombre : 'Depósito (Ninguno)'
+    }
+
+    // Modal UPS details state
+    const showUpsModal = ref(false)
+    const selectedUpsItem = ref(null)
+
+    const abrirDetallesUps = (item) => {
+      selectedUpsItem.value = item
+      showUpsModal.value = true
+    }
+
+    const cerrarDetallesUps = () => {
+      showUpsModal.value = false
+      selectedUpsItem.value = null
+    }
+
+    const getBlindobarraNombre = (id) => {
+      const bb = blindobarras.value.find(b => b.id === id)
+      return bb ? bb.nombre : 'Ninguna'
+    }
 
     // Modal Unified Creation State
     const showModal = ref(false)
@@ -972,6 +1432,13 @@ export default {
       tabGroups,
       activeTabLabel,
       items,
+      searchQuery,
+      filters,
+      resetFilters,
+      clearFilters,
+      hasActiveFilters,
+      filteredItems,
+      columnCount,
       paginatedItems,
       currentPage,
       pageSize,
@@ -990,6 +1457,16 @@ export default {
       estados,
       tiposHost,
       tiposServidor,
+      showUpsModal,
+      selectedUpsItem,
+      abrirDetallesUps,
+      cerrarDetallesUps,
+      showHostModal,
+      selectedHostItem,
+      abrirDetallesHost,
+      cerrarDetallesHost,
+      getSwitchNombre,
+      getBlindobarraNombre,
       showModal,
       modalHost,
       abrirModalAlta,

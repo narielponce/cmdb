@@ -86,17 +86,17 @@ class UPSUpdate(BaseModel):
 class UPSResponse(BaseModel):
     id: int
     nombre: str
-    blindobarra_id: int
+    blindobarra_id: Optional[int] = None
     blindobarra_nombre: Optional[str] = None
-    marca: str
-    modelo: str
-    serial: str
+    marca: Optional[str] = ""
+    modelo: Optional[str] = ""
+    serial: Optional[str] = ""
     fecha_fabricacion: Optional[date] = None
     fecha_cambio_baterias: Optional[date] = None
-    ip: str
-    vlan: str
-    capacidad_kva: float
-    estado_baterias: str
+    ip: Optional[str] = ""
+    vlan: Optional[str] = ""
+    capacidad_kva: Optional[float] = 0.0
+    estado_baterias: Optional[str] = "Ok"
     class Config:
         from_attributes = True
 
@@ -149,13 +149,13 @@ class SwitchUpdate(BaseModel):
 class SwitchResponse(BaseModel):
     id: int
     nombre: str
-    ip: str
+    ip: Optional[str] = "0.0.0.0"
     rack_id: Optional[int] = None
     rack_nombre: Optional[str] = None
-    marca: str
-    modelo: str
-    serial: str
-    vlan_gestion: str
+    marca: Optional[str] = ""
+    modelo: Optional[str] = ""
+    serial: Optional[str] = ""
+    vlan_gestion: Optional[str] = "1"
     class Config:
         from_attributes = True
 
@@ -192,14 +192,14 @@ class HostUpdate(BaseModel):
 class HostResponse(BaseModel):
     id: int
     nombre: str
-    ip: str
+    ip: Optional[str] = "0.0.0.0"
     switch_id: Optional[int] = None
     switch_nombre: Optional[str] = None
-    marca: str
-    modelo: str
-    serial: str
-    ubicacion: str
-    rol: str
+    marca: Optional[str] = ""
+    modelo: Optional[str] = ""
+    serial: Optional[str] = ""
+    ubicacion: Optional[str] = ""
+    rol: Optional[str] = "Otro"
     puerto_switch: Optional[str] = None
     sector_planta: Optional[str] = None
     class Config:
@@ -236,12 +236,12 @@ class ServidorResponse(BaseModel):
     nombre: str
     switch_id: Optional[int] = None
     switch_nombre: Optional[str] = None
-    marca: str
-    modelo: str
-    serial: str
-    ip: str
-    tipo_servidor: str
-    sistema_operativo: str
+    marca: Optional[str] = ""
+    modelo: Optional[str] = ""
+    serial: Optional[str] = ""
+    ip: Optional[str] = "0.0.0.0"
+    tipo_servidor: Optional[str] = "Virtual (VM)"
+    sistema_operativo: Optional[str] = "Linux RHEL"
     class Config:
         from_attributes = True
 
@@ -551,4 +551,37 @@ class RoleResponse(BaseModel):
     modules: List[RoleModuleResponse] = []
     class Config:
         from_attributes = True
+
+
+# ==================
+#       PLANOS
+# ==================
+class PlanoBase(BaseModel):
+    nombre: str
+    ancho: Optional[int] = 800
+    alto: Optional[int] = 600
+
+class PlanoCreate(PlanoBase):
+    pass
+
+class PlanoUpdate(BaseModel):
+    nombre: Optional[str] = None
+    ancho: Optional[int] = None
+    alto: Optional[int] = None
+
+class PlanoResponse(PlanoBase):
+    id: int
+    imagen_url: Optional[str] = None
+    class Config:
+        from_attributes = True
+
+class ItemPosition(BaseModel):
+    id: int
+    x: Optional[float] = None
+    y: Optional[float] = None
+
+class PlanoPosicionesRequest(BaseModel):
+    racks: List[ItemPosition] = []
+    hosts: List[ItemPosition] = []
+
 
