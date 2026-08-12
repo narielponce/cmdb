@@ -13,18 +13,26 @@ from .database import engine, Base, get_db
 from .config import settings
 from . import models, schemas, crud, simulator, pdf_generator
 
-# Try to run auto-migrations for positioning columns
+# Try to run auto-migrations for positioning and lifecycle columns
 with engine.connect() as conn:
     try:
         conn.execute(text("ALTER TABLE hosts ADD COLUMN IF NOT EXISTS plano_id INTEGER;"))
         conn.execute(text("ALTER TABLE hosts ADD COLUMN IF NOT EXISTS plano_x FLOAT;"))
         conn.execute(text("ALTER TABLE hosts ADD COLUMN IF NOT EXISTS plano_y FLOAT;"))
         conn.execute(text("ALTER TABLE hosts ADD COLUMN IF NOT EXISTS checkmk_host_id VARCHAR;"))
+        conn.execute(text("ALTER TABLE hosts ADD COLUMN IF NOT EXISTS fecha_instalacion DATE;"))
+        conn.execute(text("ALTER TABLE hosts ADD COLUMN IF NOT EXISTS ultimo_mantenimiento DATE;"))
+        conn.execute(text("ALTER TABLE hosts ADD COLUMN IF NOT EXISTS proximo_mantenimiento DATE;"))
+        conn.execute(text("ALTER TABLE hosts ADD COLUMN IF NOT EXISTS proximo_cambio_baterias DATE;"))
+        conn.execute(text("ALTER TABLE hosts ADD COLUMN IF NOT EXISTS fecha_eol DATE;"))
+        conn.execute(text("ALTER TABLE hosts ADD COLUMN IF NOT EXISTS fin_garantia_contrato DATE;"))
+        conn.execute(text("ALTER TABLE hosts ADD COLUMN IF NOT EXISTS proveedor_soporte VARCHAR;"))
+        conn.execute(text("ALTER TABLE hosts ADD COLUMN IF NOT EXISTS numero_contrato VARCHAR;"))
         conn.execute(text("ALTER TABLE racks ADD COLUMN IF NOT EXISTS plano_id INTEGER;"))
         conn.execute(text("ALTER TABLE racks ADD COLUMN IF NOT EXISTS plano_x FLOAT;"))
         conn.execute(text("ALTER TABLE racks ADD COLUMN IF NOT EXISTS plano_y FLOAT;"))
         conn.commit()
-        print("🌱 Auto-migration of positioning columns and Checkmk field succeeded.")
+        print("🌱 Auto-migration of positioning, Checkmk field, and ITAM lifecycle columns succeeded.")
     except Exception as e:
         print(f"Skipping auto-migration columns: {e}")
 
@@ -1751,5 +1759,133 @@ def checkmk_webhook_receiver(payload: CheckmkWebhookPayload, db: Session = Depen
         "affected_downstream": affected_nodes
     }
 
+@app.get("/api/v1/itam/lifecycle/alerts")
+def get_itam_lifecycle_alerts(db: Session = Depends(get_db)):
+    from datetime import date
+    
+    today = date.today()
+    assets = db.query(models.Host).all()
+    
+    kpis = {
+        "baterias_critico": 0,
+        "baterias_proximo": 0,
+        "mantenimiento_critico": 0,
+        "mantenimiento_proximo": 0,
+        "eol_critico": 0,
+        "eol_proximo": 0,
+        "garantia_critico": 0,
+        "garantia_proximo": 0
+    }
+    
+    inventory = []
+    
+    for asset in assets:
+        tipo = asset.tipo_host.nombre if asset.tipo_host else ""
+        if tipo not in ["UPS", "Switch", "Servidor", "Host", "AP", "Cámara"]:
+            continue
 
-
+        # Calculate health alert statuses
+        maint_status = "VIGENTE"
+        maint_days = None
+        if asset.proximo_mantenimiento:
+            diff = (asset.proximo_mantenimiento - today).days
+            maint_days = diff
+            if diff < 0:
+                maint_status = "VENCIDO"
+                kpis["mantenimiento_critico"] += 1
+            elif diff <= 60:
+                maint_status = "PROXIMO"
+                kpis["mantenimiento_proximo"] += 1
+                
+        bat_status = "VIGENTE"
+        bat_days = None
+        if tipo == "UPS" and asset.proximo_cambio_baterias:
+            diff = (asset.proximo_cambio_baterias - today).days
+            bat_days = diff
+            if diff < 0:
+                bat_status = "VENCIDO"
+                kpis["baterias_critico"] += 1
+            elif diff <= 60:
+                bat_status = "PROXIMO"
+                kpis["baterias_proximo"] += 1
+                
+        eol_status = "VIGENTE"
+        eol_days = None
+        if asset.fecha_eol:
+            diff = (asset.fecha_eol - today).days
+            eol_days = diff
+            if diff < 0:
+                eol_status = "VENCIDO"
+                kpis["eol_critico"] += 1
+            elif diff <= 90:
+                eol_status = "PROXIMO"
+                kpis["eol_proximo"] += 1
+                
+        gar_status = "VIGENTE"
+        gar_days = None
+        if asset.fin_garantia_contrato:
+            diff = (asset.fin_garantia_contrato - today).days
+            gar_days = diff
+            if diff < 0:
+                gar_status = "VENCIDO"
+                kpis["garantia_critico"] += 1
+            elif diff <= 90:
+                gar_status = "PROXIMO"
+                kpis["garantia_proximo"] += 1
+                
+        # Consolidated health
+        if "VENCIDO" in [maint_status, bat_status, eol_status, gar_status]:
+            estado_salud = "VENCIDO/CRITICO"
+        elif "PROXIMO" in [maint_status, bat_status, eol_status, gar_status]:
+            estado_salud = "PROXIMO_A_VENCER"
+        else:
+            estado_salud = "VIGENTE"
+            
+        # Collect detailed warnings
+        alertas = []
+        if maint_status == "VENCIDO":
+            alertas.append("Mantenimiento preventivo vencido.")
+        elif maint_status == "PROXIMO":
+            alertas.append(f"Mantenimiento preventivo próximo a vencer ({maint_days} días).")
+            
+        if bat_status == "VENCIDO":
+            alertas.append("Reemplazo de baterías vencido.")
+        elif bat_status == "PROXIMO":
+            alertas.append(f"Reemplazo de baterías próximo a vencer ({bat_days} días).")
+            
+        if eol_status == "VENCIDO":
+            alertas.append("Fin de vida útil (EOL/EOS) alcanzado.")
+        elif eol_status == "PROXIMO":
+            alertas.append(f"Fin de vida útil (EOL/EOS) próximo a ocurrir ({eol_days} días).")
+            
+        if gar_status == "VENCIDO":
+            alertas.append("Garantía/Contrato de soporte vencido.")
+        elif gar_status == "PROXIMO":
+            alertas.append(f"Garantía/Contrato de soporte próximo a vencer ({gar_days} días).")
+            
+        inventory.append({
+            "id": asset.id,
+            "nombre": asset.nombre,
+            "tipo": tipo,
+            "ip": asset.ip,
+            "ubicacion": asset.ubicacion,
+            "marca": asset.marca.nombre if asset.marca else "",
+            "modelo": asset.modelo,
+            "serial": asset.serial,
+            "fecha_instalacion": asset.fecha_instalacion.isoformat() if asset.fecha_instalacion else None,
+            "ultimo_mantenimiento": asset.ultimo_mantenimiento.isoformat() if asset.ultimo_mantenimiento else None,
+            "proximo_mantenimiento": asset.proximo_mantenimiento.isoformat() if asset.proximo_mantenimiento else None,
+            "fecha_cambio_baterias": asset.fecha_cambio_baterias.isoformat() if asset.fecha_cambio_baterias else None,
+            "proximo_cambio_baterias": asset.proximo_cambio_baterias.isoformat() if asset.proximo_cambio_baterias else None,
+            "fecha_eol": asset.fecha_eol.isoformat() if asset.fecha_eol else None,
+            "fin_garantia_contrato": asset.fin_garantia_contrato.isoformat() if asset.fin_garantia_contrato else None,
+            "proveedor_soporte": asset.proveedor_soporte or "",
+            "numero_contrato": asset.numero_contrato or "",
+            "estado_salud": estado_salud,
+            "alertas": alertas
+        })
+        
+    return {
+        "kpis": kpis,
+        "inventory": inventory
+    }

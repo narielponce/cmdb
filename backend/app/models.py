@@ -94,6 +94,14 @@ class Host(Base):
     capacidad_kva = Column(Float, nullable=True) # for UPS
     fecha_fabricacion = Column(Date, nullable=True) # for UPS
     fecha_cambio_baterias = Column(Date, nullable=True) # for UPS
+    proximo_cambio_baterias = Column(Date, nullable=True) # for UPS
+    fecha_instalacion = Column(Date, nullable=True)
+    ultimo_mantenimiento = Column(Date, nullable=True)
+    proximo_mantenimiento = Column(Date, nullable=True)
+    fecha_eol = Column(Date, nullable=True)
+    fin_garantia_contrato = Column(Date, nullable=True)
+    proveedor_soporte = Column(String, default="")
+    numero_contrato = Column(String, default="")
     sistema_operativo = Column(String, nullable=True) # for Servidor
     ubicacion = Column(String, default="") # for Host/UPS
     rol = Column(String, default="Otro") # for Host

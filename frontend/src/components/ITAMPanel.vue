@@ -5,6 +5,9 @@
       <button class="tab-btn" :class="{ active: activeTab === 'inventory' }" @click="activeTab = 'inventory'">
         🔍 Consolidado de Equipos
       </button>
+      <button class="tab-btn" :class="{ active: activeTab === 'lifecycle' }" @click="activeTab = 'lifecycle'">
+        📅 Ciclo de Vida & Alertas
+      </button>
       <button class="tab-btn" :class="{ active: activeTab === 'operations' }" @click="activeTab = 'operations'">
         📥 / 📤 Operaciones
       </button>
@@ -463,6 +466,296 @@
           No se registran movimientos en el historial.
         </div>
       </div>
+      </div>
+
+    <!-- TAB 5: Ciclo de Vida & Alertas Preventivas -->
+    <div v-if="activeTab === 'lifecycle'">
+      <!-- KPI cards -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+        <div class="glass-panel" style="border-left: 4px solid var(--danger); display: flex; flex-direction: column; padding: 1rem; border-radius: 8px;">
+          <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Mantenimientos Vencidos / Próximos</span>
+          <span style="font-size: 2rem; font-bold; color: var(--text-main); margin-top: 0.5rem; font-weight: 700;">
+            {{ (lifecycleKpis.mantenimiento_critico || 0) + (lifecycleKpis.mantenimiento_proximo || 0) }}
+          </span>
+          <div style="font-size: 0.7rem; margin-top: 0.25rem; display: flex; gap: 0.5rem;">
+            <span style="color: var(--danger); font-weight: bold;">🔴 {{ lifecycleKpis.mantenimiento_critico || 0 }} Vencidos</span>
+            <span style="color: var(--warning); font-weight: bold;">🟡 {{ lifecycleKpis.mantenimiento_proximo || 0 }} Próximos</span>
+          </div>
+        </div>
+        
+        <div class="glass-panel" style="border-left: 4px solid #f97316; display: flex; flex-direction: column; padding: 1rem; border-radius: 8px;">
+          <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Baterías por Vencer / Vencidas</span>
+          <span style="font-size: 2rem; font-bold; color: var(--text-main); margin-top: 0.5rem; font-weight: 700;">
+            {{ (lifecycleKpis.baterias_critico || 0) + (lifecycleKpis.baterias_proximo || 0) }}
+          </span>
+          <div style="font-size: 0.7rem; margin-top: 0.25rem; display: flex; gap: 0.5rem;">
+            <span style="color: var(--danger); font-weight: bold;">🔴 {{ lifecycleKpis.baterias_critico || 0 }} Vencidas</span>
+            <span style="color: var(--warning); font-weight: bold;">🟡 {{ lifecycleKpis.baterias_proximo || 0 }} Próximas</span>
+          </div>
+        </div>
+        
+        <div class="glass-panel" style="border-left: 4px solid #eab308; display: flex; flex-direction: column; padding: 1rem; border-radius: 8px;">
+          <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Equipos EOL Vencidos / Próximos</span>
+          <span style="font-size: 2rem; font-bold; color: var(--text-main); margin-top: 0.5rem; font-weight: 700;">
+            {{ (lifecycleKpis.eol_critico || 0) + (lifecycleKpis.eol_proximo || 0) }}
+          </span>
+          <div style="font-size: 0.7rem; margin-top: 0.25rem; display: flex; gap: 0.5rem;">
+            <span style="color: var(--danger); font-weight: bold;">🔴 {{ lifecycleKpis.eol_critico || 0 }} EOL</span>
+            <span style="color: var(--warning); font-weight: bold;">🟡 {{ lifecycleKpis.eol_proximo || 0 }} Próximos</span>
+          </div>
+        </div>
+        
+        <div class="glass-panel" style="border-left: 4px solid #8b5cf6; display: flex; flex-direction: column; padding: 1rem; border-radius: 8px;">
+          <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Garantías Vencidas / Próximas</span>
+          <span style="font-size: 2rem; font-bold; color: var(--text-main); margin-top: 0.5rem; font-weight: 700;">
+            {{ (lifecycleKpis.garantia_critico || 0) + (lifecycleKpis.garantia_proximo || 0) }}
+          </span>
+          <div style="font-size: 0.7rem; margin-top: 0.25rem; display: flex; gap: 0.5rem;">
+            <span style="color: var(--danger); font-weight: bold;">🔴 {{ lifecycleKpis.garantia_critico || 0 }} Vencidos</span>
+            <span style="color: var(--warning); font-weight: bold;">🟡 {{ lifecycleKpis.garantia_proximo || 0 }} Próximos</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Toolbar: Search, Filter, Export -->
+      <div class="glass-panel" style="margin-bottom: 1.5rem; padding: 1rem; border-radius: 8px;">
+        <div style="display: flex; flex-direction: row; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap;">
+          <div style="flex: 1; min-width: 250px;">
+            <input 
+              type="text" 
+              v-model="searchLifecycleQuery" 
+              placeholder="Buscar por nombre, IP, serie, marca..." 
+              class="form-input text-xs" 
+            />
+          </div>
+          
+          <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+            <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted);">Filtrar Salud:</span>
+            <div style="display: flex; gap: 0.25rem;">
+              <button 
+                v-for="st in ['TODOS', 'VENCIDO/CRITICO', 'PROXIMO_A_VENCER', 'VIGENTE']" 
+                :key="st"
+                @click="filterHealth = st"
+                class="px-2.5 py-1 text-xs rounded-lg font-semibold border transition shadow-sm"
+                :style="filterHealth === st 
+                  ? { backgroundColor: 'var(--brand-accent)', color: 'white', borderColor: 'var(--brand-accent)' } 
+                  : { backgroundColor: 'white', color: 'var(--text-main)', borderColor: 'var(--panel-border)' }"
+              >
+                {{ st === 'TODOS' ? 'Todos' : (st === 'VENCIDO/CRITICO' ? '🔴 Vencido' : (st === 'PROXIMO_A_VENCER' ? '🟡 Próximo' : '🟢 Vigente')) }}
+              </button>
+            </div>
+          </div>
+
+          <button 
+            @click="exportLifecycleCSV" 
+            class="btn btn-secondary"
+            style="width: auto; padding: 0.5rem 1rem; font-size: 0.75rem;"
+          >
+            📊 Exportar CSV
+          </button>
+        </div>
+      </div>
+
+      <!-- Alerts List Table -->
+      <div class="glass-panel" style="padding: 1rem; border-radius: 8px;">
+        <div class="table-container" v-if="filteredLifecycle.length > 0">
+          <table class="custom-table text-xs">
+            <thead>
+              <tr>
+                <th>Equipo</th>
+                <th>IP / Ubicación</th>
+                <th>Garantía / Contrato</th>
+                <th>Mantenimiento</th>
+                <th>Baterías (UPS)</th>
+                <th>Fin de Vida (EOL)</th>
+                <th>Estado</th>
+                <th style="width: 80px;">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in paginatedLifecycle" :key="item.tipo + '-' + item.id">
+                <td>
+                  <div style="display: flex; flex-direction: column;">
+                    <span style="font-weight: bold; color: var(--text-main);">{{ item.nombre }}</span>
+                    <span style="font-size: 0.7rem; color: var(--text-muted);">{{ item.tipo }} • {{ item.marca }} {{ item.modelo }}</span>
+                  </div>
+                </td>
+                <td>
+                  <div style="display: flex; flex-direction: column;">
+                    <span>{{ item.ip || '-' }}</span>
+                    <span style="font-size: 0.7rem; color: var(--text-muted);">{{ item.ubicacion || '-' }}</span>
+                  </div>
+                </td>
+                <td>
+                  <div style="display: flex; flex-direction: column;" v-if="item.fin_garantia_contrato">
+                    <span>{{ formatearFecha(item.fin_garantia_contrato) }}</span>
+                    <span style="font-size: 0.65rem; color: var(--text-muted); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" :title="item.proveedor_soporte">
+                      {{ item.proveedor_soporte }} ({{ item.numero_contrato || 'S/N' }})
+                    </span>
+                  </div>
+                  <span v-else style="color: var(--text-muted);">-</span>
+                </td>
+                <td>
+                  <div style="display: flex; flex-direction: column;">
+                    <span style="font-size: 0.65rem; color: var(--text-muted);" v-if="item.ultimo_mantenimiento">U: {{ formatearFecha(item.ultimo_mantenimiento) }}</span>
+                    <span v-if="item.proximo_mantenimiento" style="font-weight: 600;">P: {{ formatearFecha(item.proximo_mantenimiento) }}</span>
+                    <span v-else style="color: var(--text-muted);">-</span>
+                  </div>
+                </td>
+                <td>
+                  <div style="display: flex; flex-direction: column;" v-if="item.tipo === 'UPS'">
+                    <span style="font-size: 0.65rem; color: var(--text-muted);" v-if="item.fecha_cambio_baterias">U: {{ formatearFecha(item.fecha_cambio_baterias) }}</span>
+                    <span v-if="item.proximo_cambio_baterias" style="font-weight: 600;">P: {{ formatearFecha(item.proximo_cambio_baterias) }}</span>
+                    <span v-else style="color: var(--text-muted);">-</span>
+                  </div>
+                  <span v-else style="color: var(--text-muted);">-</span>
+                </td>
+                <td>
+                  <span v-if="item.fecha_eol">{{ formatearFecha(item.fecha_eol) }}</span>
+                  <span v-else style="color: var(--text-muted);">-</span>
+                </td>
+                <td>
+                  <span 
+                    class="badge" 
+                    :class="[
+                      item.estado_salud === 'VENCIDO/CRITICO' ? 'badge-deposito' : (item.estado_salud === 'PROXIMO_A_VENCER' ? 'badge-deposito' : 'badge-produccion')
+                    ]"
+                    :style="item.estado_salud === 'VENCIDO/CRITICO' 
+                      ? { backgroundColor: 'var(--danger-bg)', color: 'var(--danger)' } 
+                      : (item.estado_salud === 'PROXIMO_A_VENCER' ? { backgroundColor: '#fef3c7', color: '#b45309' } : {})"
+                  >
+                    {{ item.estado_salud === 'VENCIDO/CRITICO' ? '🔴 Vencido' : (item.estado_salud === 'PROXIMO_A_VENCER' ? '🟡 Próximo' : '🟢 Vigente') }}
+                  </span>
+                </td>
+                <td>
+                  <button 
+                    v-if="canWrite" 
+                    @click="openEditModal(item)" 
+                    class="btn btn-secondary"
+                    style="width: auto; padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: bold;"
+                  >
+                    ✍️ Fechas
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        
+        <div v-else style="text-align: center; padding: 2rem; color: var(--text-muted);">
+          No se encontraron equipos en este estado de ciclo de vida.
+        </div>
+
+        <!-- Controles de Paginación para Lifecycle -->
+        <div v-if="filteredLifecycle.length > 0" class="flex flex-col sm:flex-row justify-between items-center gap-4 mt-4 bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm" style="margin-top: 1rem;">
+          <div class="text-sm text-slate-600 font-medium">
+            Mostrando {{ (currentLifecyclePage - 1) * lifecyclePageSize + 1 }} - {{ Math.min(currentLifecyclePage * lifecyclePageSize, filteredLifecycle.length) }} de {{ filteredLifecycle.length }} registros
+          </div>
+          <div class="flex items-center gap-1">
+            <button 
+              @click="currentLifecyclePage > 1 && (currentLifecyclePage--)" 
+              :disabled="currentLifecyclePage === 1"
+              class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none transition text-sm font-medium shadow-sm"
+            >
+              ◀ Anterior
+            </button>
+            
+            <button 
+              v-for="p in visibleLifecyclePages" 
+              :key="p"
+              @click="currentLifecyclePage = p"
+              :class="['px-3 py-1.5 rounded-lg text-sm font-semibold transition shadow-sm', p === currentLifecyclePage ? 'bg-primary text-white' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50']"
+            >
+              {{ p }}
+            </button>
+
+            <button 
+              @click="currentLifecyclePage < totalLifecyclePages && (currentLifecyclePage++)" 
+              :disabled="currentLifecyclePage === totalLifecyclePages"
+              class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none transition text-sm font-medium shadow-sm"
+            >
+              Siguiente ▶
+            </button>
+          </div>
+          <div class="flex items-center gap-2 text-sm text-slate-600 font-medium">
+            Filas por página:
+            <select v-model="lifecyclePageSize" class="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-slate-700 font-semibold shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20">
+              <option :value="5">5</option>
+              <option :value="10">10</option>
+              <option :value="20">20</option>
+              <option :value="50">50</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Edit Lifecycle Dates Modal (Only visible if canWrite and showEditModal) -->
+    <div v-if="showEditModal" style="display: flex; align-items: center; justify-content: center; position: fixed; top: 0; left: 0; width: 100%; height: 100%; backgroundColor: rgba(15, 23, 42, 0.6); z-index: 9999;">
+      <div class="glass-panel" style="width: 100%; max-width: 500px; padding: 1.5rem; max-height: 90vh; overflow-y: auto; border: 1px solid var(--panel-border);">
+        <h3 style="font-weight: bold; color: var(--text-main); font-size: 1.1rem; border-bottom: 1px solid var(--panel-border); padding-bottom: 0.5rem; margin-bottom: 1rem;">
+          📅 Editar Fechas: {{ editingAsset?.nombre }}
+        </h3>
+        
+        <form @submit.prevent="submitEditLifecycle">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem;">
+            <div style="grid-column: span 2;" class="form-group">
+              <label class="form-label text-xs">Fecha de Instalación</label>
+              <input type="date" v-model="editForm.fecha_instalacion" class="form-input text-xs" style="width: 100%;" />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label text-xs">Último Mantenimiento</label>
+              <input type="date" v-model="editForm.ultimo_mantenimiento" class="form-input text-xs" style="width: 100%;" />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label text-xs">Próximo Mantenimiento</label>
+              <input type="date" v-model="editForm.proximo_mantenimiento" class="form-input text-xs" style="width: 100%;" />
+            </div>
+
+            <!-- UPS specific battery fields -->
+            <template v-if="editingAsset?.tipo === 'UPS'">
+              <div class="form-group">
+                <label class="form-label text-xs">Último Cambio Baterías</label>
+                <input type="date" v-model="editForm.fecha_cambio_baterias" class="form-input text-xs" style="width: 100%;" />
+              </div>
+
+              <div class="form-group">
+                <label class="form-label text-xs">Próximo Cambio Baterías</label>
+                <input type="date" v-model="editForm.proximo_cambio_baterias" class="form-input text-xs" style="width: 100%;" />
+              </div>
+            </template>
+
+            <div style="grid-column: span 2;" class="form-group">
+              <label class="form-label text-xs">Fin de Vida Útil (EOL / EOS)</label>
+              <input type="date" v-model="editForm.fecha_eol" class="form-input text-xs" style="width: 100%;" />
+            </div>
+
+            <div style="grid-column: span 2;" class="form-group">
+              <label class="form-label text-xs">Fin de Garantía / Soporte</label>
+              <input type="date" v-model="editForm.fin_garantia_contrato" class="form-input text-xs" style="width: 100%;" />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label text-xs">Proveedor del Soporte</label>
+              <input type="text" v-model="editForm.proveedor_soporte" placeholder="Ej: Cisco, IBM" class="form-input text-xs" style="width: 100%;" />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label text-xs">Número de Contrato</label>
+              <input type="text" v-model="editForm.numero_contrato" placeholder="Ej: CON-190" class="form-input text-xs" style="width: 100%;" />
+            </div>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 0.75rem; border-top: 1px solid var(--panel-border); padding-top: 1rem;">
+            <button type="button" class="btn btn-secondary" style="max-width: 100px; font-size: 0.75rem;" @click="showEditModal = false">Cancelar</button>
+            <button type="submit" class="btn btn-primary" style="max-width: 120px; font-size: 0.75rem;" :disabled="submittingEdit">
+              {{ submittingEdit ? '💾 Guardando...' : '💾 Guardar' }}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   </div>
 </template>
@@ -476,6 +769,31 @@ export default {
   setup() {
     const activeTab = ref('inventory')
     const canWrite = ref(false)
+
+    // Lifecycle alerts state
+    const lifecycleInventory = ref([])
+    const lifecycleKpis = ref({})
+    const loadingLifecycle = ref(false)
+    const filterHealth = ref('TODOS')
+    const searchLifecycleQuery = ref('')
+    const currentLifecyclePage = ref(1)
+    const lifecyclePageSize = ref(10)
+    
+    // Quick edit modal
+    const showEditModal = ref(false)
+    const editingAsset = ref(null)
+    const submittingEdit = ref(false)
+    const editForm = ref({
+      fecha_instalacion: '',
+      ultimo_mantenimiento: '',
+      proximo_mantenimiento: '',
+      fecha_cambio_baterias: '',
+      proximo_cambio_baterias: '',
+      fecha_eol: '',
+      fin_garantia_contrato: '',
+      proveedor_soporte: '',
+      numero_contrato: ''
+    })
 
     const loadUserPermissions = () => {
       const savedUser = localStorage.getItem('net_cmdb_user')
@@ -584,6 +902,49 @@ export default {
         return data.filter(item => item.ubicacion_estado === '🟢 En Producción')
       }
       return data
+    })
+
+    const filteredLifecycle = computed(() => {
+      let data = lifecycleInventory.value
+      
+      if (filterHealth.value !== 'TODOS') {
+        data = data.filter(item => item.estado_salud === filterHealth.value)
+      }
+      
+      if (searchLifecycleQuery.value.trim()) {
+        const q = searchLifecycleQuery.value.toLowerCase().trim()
+        data = data.filter(item => 
+          item.nombre.toLowerCase().includes(q) ||
+          (item.ip && item.ip.toLowerCase().includes(q)) ||
+          item.tipo.toLowerCase().includes(q) ||
+          (item.marca && item.marca.toLowerCase().includes(q)) ||
+          (item.modelo && item.modelo.toLowerCase().includes(q)) ||
+          (item.serial && item.serial.toLowerCase().includes(q))
+        )
+      }
+      return data
+    })
+
+    const totalLifecyclePages = computed(() => Math.ceil(filteredLifecycle.value.length / lifecyclePageSize.value) || 1)
+
+    const paginatedLifecycle = computed(() => {
+      const start = (currentLifecyclePage.value - 1) * lifecyclePageSize.value
+      const end = start + lifecyclePageSize.value
+      return filteredLifecycle.value.slice(start, end)
+    })
+
+    const visibleLifecyclePages = computed(() => {
+      const pages = []
+      const maxVisible = 5
+      let start = Math.max(1, currentLifecyclePage.value - 2)
+      let end = Math.min(totalLifecyclePages.value, start + maxVisible - 1)
+      if (end - start + 1 < maxVisible) {
+        start = Math.max(1, end - maxVisible + 1)
+      }
+      for (let i = start; i <= end; i++) {
+        pages.push(i)
+      }
+      return pages
     })
 
     const equiposDeposito = computed(() => {
@@ -696,6 +1057,107 @@ export default {
         console.error("Error fetching historical movements", error)
       } finally {
         loadingHistorial.value = false
+      }
+    }
+
+    const fetchLifecycle = async () => {
+      loadingLifecycle.value = true
+      try {
+        const response = await axios.get('/api/v1/itam/lifecycle/alerts')
+        lifecycleInventory.value = response.data.inventory
+        lifecycleKpis.value = response.data.kpis
+      } catch (error) {
+        console.error("Error fetching lifecycle details", error)
+      } finally {
+        loadingLifecycle.value = false
+      }
+    }
+
+    const exportLifecycleCSV = () => {
+      const headers = [
+        "Tipo", "Nombre", "Marca", "Modelo", "Nro Serie", "IP", "Ubicacion",
+        "Fecha Instalacion", "Ultimo Mantenimiento", "Proximo Mantenimiento",
+        "Cambio Baterias (UPS)", "Proximo Cambio Baterias (UPS)",
+        "Fin de Vida (EOL)", "Fin Garantia/Soporte", "Proveedor Soporte", "Nro Contrato",
+        "Estado Salud", "Alertas"
+      ]
+      
+      const rows = filteredLifecycle.value.map(item => [
+        item.tipo,
+        item.nombre,
+        item.marca,
+        item.modelo,
+        item.serial,
+        item.ip || '',
+        item.ubicacion || '',
+        item.fecha_instalacion || '',
+        item.ultimo_mantenimiento || '',
+        item.proximo_mantenimiento || '',
+        item.fecha_cambio_baterias || '',
+        item.proximo_cambio_baterias || '',
+        item.fecha_eol || '',
+        item.fin_garantia_contrato || '',
+        item.proveedor_soporte || '',
+        item.numero_contrato || '',
+        item.estado_salud,
+        (item.alertas || []).join('; ')
+      ])
+      
+      let csvContent = "data:text/csv;charset=utf-8,\uFEFF"
+      csvContent += [headers.join(','), ...rows.map(r => r.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))].join('\n')
+      
+      const encodedUri = encodeURI(csvContent)
+      const link = document.createElement("a")
+      link.setAttribute("href", encodedUri)
+      link.setAttribute("download", `nettrack_itam_lifecycle_${new Date().toISOString().split('T')[0]}.csv`)
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    }
+
+    const openEditModal = (item) => {
+      editingAsset.value = item
+      editForm.value = {
+        fecha_instalacion: item.fecha_instalacion || '',
+        ultimo_mantenimiento: item.ultimo_mantenimiento || '',
+        proximo_mantenimiento: item.proximo_mantenimiento || '',
+        fecha_cambio_baterias: item.fecha_cambio_baterias || '',
+        proximo_cambio_baterias: item.proximo_cambio_baterias || '',
+        fecha_eol: item.fecha_eol || '',
+        fin_garantia_contrato: item.fin_garantia_contrato || '',
+        proveedor_soporte: item.proveedor_soporte || '',
+        numero_contrato: item.numero_contrato || ''
+      }
+      showEditModal.value = true
+    }
+
+    const submitEditLifecycle = async () => {
+      if (!editingAsset.value) return
+      submittingEdit.value = true
+      
+      let url = ''
+      if (editingAsset.value.tipo === 'UPS') url = `/api/ups/${editingAsset.value.id}`
+      else if (editingAsset.value.tipo === 'Switch') url = `/api/switches/${editingAsset.value.id}`
+      else if (editingAsset.value.tipo === 'Servidor') url = `/api/servidores/${editingAsset.value.id}`
+      else url = `/api/hosts/${editingAsset.value.id}`
+      
+      // Clean up empty string dates to null to prevent Pydantic parser issues
+      const cleanedPayload = {}
+      for (const [key, value] of Object.entries(editForm.value)) {
+        cleanedPayload[key] = value === '' ? null : value
+      }
+      
+      try {
+        await axios.put(url, cleanedPayload)
+        alert("✨ Fechas de ciclo de vida actualizadas con éxito.")
+        showEditModal.value = false
+        await fetchLifecycle()
+        await fetchInventory()
+      } catch (error) {
+        console.error("Error updating lifecycle fields", error)
+        alert("Ocurrió un error al actualizar las fechas.")
+      } finally {
+        submittingEdit.value = false
       }
     }
 
@@ -915,12 +1377,15 @@ export default {
         fetchConsumibles()
       } else if (newTab === 'history') {
         fetchHistorial()
+      } else if (newTab === 'lifecycle') {
+        fetchLifecycle()
       }
     })
 
     onMounted(() => {
       loadUserPermissions()
       fetchInventory()
+      fetchLifecycle()
     })
 
     return {
@@ -961,6 +1426,24 @@ export default {
       destinosFiltrados,
       consumiblesDisponibles,
       selectedInsumoStock,
+      
+      // Lifecycle exports
+      lifecycleInventory,
+      lifecycleKpis,
+      loadingLifecycle,
+      filterHealth,
+      searchLifecycleQuery,
+      currentLifecyclePage,
+      lifecyclePageSize,
+      totalLifecyclePages,
+      paginatedLifecycle,
+      visibleLifecyclePages,
+      showEditModal,
+      editingAsset,
+      submittingEdit,
+      editForm,
+      filteredLifecycle,
+      
       onFileChange,
       onDesplegarEquipoChange,
       onInsumoChange,
@@ -971,7 +1454,11 @@ export default {
       guardarFilaConsumible,
       eliminarFilaConsumible,
       formatearFecha,
-      renderizarDetalle
+      renderizarDetalle,
+      fetchLifecycle,
+      exportLifecycleCSV,
+      openEditModal,
+      submitEditLifecycle
     }
   }
 }

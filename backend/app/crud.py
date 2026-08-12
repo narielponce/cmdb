@@ -280,7 +280,15 @@ def get_ups_all(db: Session):
             "vlan": u.vlan,
             "capacidad_kva": u.capacidad_kva or 0.0,
             "estado_baterias": u.estado.nombre if u.estado else "Ok",
-            "checkmk_host_id": u.checkmk_host_id
+            "checkmk_host_id": u.checkmk_host_id,
+            "proximo_cambio_baterias": u.proximo_cambio_baterias,
+            "fecha_instalacion": u.fecha_instalacion,
+            "ultimo_mantenimiento": u.ultimo_mantenimiento,
+            "proximo_mantenimiento": u.proximo_mantenimiento,
+            "fecha_eol": u.fecha_eol,
+            "fin_garantia_contrato": u.fin_garantia_contrato,
+            "proveedor_soporte": u.proveedor_soporte or "",
+            "numero_contrato": u.numero_contrato or ""
         })
     return mapped
 
@@ -297,6 +305,14 @@ def get_ups(db: Session, ups_id: int):
             "serial": u.serial,
             "fecha_fabricacion": u.fecha_fabricacion,
             "fecha_cambio_baterias": u.fecha_cambio_baterias,
+            "proximo_cambio_baterias": u.proximo_cambio_baterias,
+            "fecha_instalacion": u.fecha_instalacion,
+            "ultimo_mantenimiento": u.ultimo_mantenimiento,
+            "proximo_mantenimiento": u.proximo_mantenimiento,
+            "fecha_eol": u.fecha_eol,
+            "fin_garantia_contrato": u.fin_garantia_contrato,
+            "proveedor_soporte": u.proveedor_soporte or "",
+            "numero_contrato": u.numero_contrato or "",
             "ip": u.ip,
             "vlan": u.vlan,
             "capacidad_kva": u.capacidad_kva or 0.0,
@@ -406,7 +422,14 @@ def get_switches(db: Session):
             "modelo": s.modelo,
             "serial": s.serial,
             "vlan_gestion": s.vlan,
-            "checkmk_host_id": s.checkmk_host_id
+            "checkmk_host_id": s.checkmk_host_id,
+            "fecha_instalacion": s.fecha_instalacion,
+            "ultimo_mantenimiento": s.ultimo_mantenimiento,
+            "proximo_mantenimiento": s.proximo_mantenimiento,
+            "fecha_eol": s.fecha_eol,
+            "fin_garantia_contrato": s.fin_garantia_contrato,
+            "proveedor_soporte": s.proveedor_soporte or "",
+            "numero_contrato": s.numero_contrato or ""
         })
     return mapped
 
@@ -423,7 +446,14 @@ def get_switch(db: Session, sw_id: int):
             "modelo": s.modelo,
             "serial": s.serial,
             "vlan_gestion": s.vlan,
-            "checkmk_host_id": s.checkmk_host_id
+            "checkmk_host_id": s.checkmk_host_id,
+            "fecha_instalacion": s.fecha_instalacion,
+            "ultimo_mantenimiento": s.ultimo_mantenimiento,
+            "proximo_mantenimiento": s.proximo_mantenimiento,
+            "fecha_eol": s.fecha_eol,
+            "fin_garantia_contrato": s.fin_garantia_contrato,
+            "proveedor_soporte": s.proveedor_soporte or "",
+            "numero_contrato": s.numero_contrato or ""
         }
     return None
 
@@ -490,7 +520,14 @@ def get_hosts(db: Session):
             "rol": h.tipo_host.nombre if h.tipo_host else "Host",
             "puerto_switch": h.puerto_switch,
             "sector_planta": h.ubicacion,
-            "checkmk_host_id": h.checkmk_host_id
+            "checkmk_host_id": h.checkmk_host_id,
+            "fecha_instalacion": h.fecha_instalacion,
+            "ultimo_mantenimiento": h.ultimo_mantenimiento,
+            "proximo_mantenimiento": h.proximo_mantenimiento,
+            "fecha_eol": h.fecha_eol,
+            "fin_garantia_contrato": h.fin_garantia_contrato,
+            "proveedor_soporte": h.proveedor_soporte or "",
+            "numero_contrato": h.numero_contrato or ""
         })
     return mapped
 
@@ -510,7 +547,14 @@ def get_host(db: Session, host_id: int):
             "rol": h.tipo_host.nombre if h.tipo_host else "Host",
             "puerto_switch": h.puerto_switch,
             "sector_planta": h.ubicacion,
-            "checkmk_host_id": h.checkmk_host_id
+            "checkmk_host_id": h.checkmk_host_id,
+            "fecha_instalacion": h.fecha_instalacion,
+            "ultimo_mantenimiento": h.ultimo_mantenimiento,
+            "proximo_mantenimiento": h.proximo_mantenimiento,
+            "fecha_eol": h.fecha_eol,
+            "fin_garantia_contrato": h.fin_garantia_contrato,
+            "proveedor_soporte": h.proveedor_soporte or "",
+            "numero_contrato": h.numero_contrato or ""
         }
     return None
 
@@ -580,7 +624,14 @@ def get_servidores(db: Session):
             "ip": s.ip,
             "tipo_servidor": s.tipo_servidor.nombre if s.tipo_servidor else "Virtual (VM)",
             "sistema_operativo": s.sistema_operativo or "",
-            "checkmk_host_id": s.checkmk_host_id
+            "checkmk_host_id": s.checkmk_host_id,
+            "fecha_instalacion": s.fecha_instalacion,
+            "ultimo_mantenimiento": s.ultimo_mantenimiento,
+            "proximo_mantenimiento": s.proximo_mantenimiento,
+            "fecha_eol": s.fecha_eol,
+            "fin_garantia_contrato": s.fin_garantia_contrato,
+            "proveedor_soporte": s.proveedor_soporte or "",
+            "numero_contrato": s.numero_contrato or ""
         })
     return mapped
 
@@ -598,7 +649,14 @@ def get_servidor(db: Session, srv_id: int):
             "ip": s.ip,
             "tipo_servidor": s.tipo_servidor.nombre if s.tipo_servidor else "Virtual (VM)",
             "sistema_operativo": s.sistema_operativo or "",
-            "checkmk_host_id": s.checkmk_host_id
+            "checkmk_host_id": s.checkmk_host_id,
+            "fecha_instalacion": s.fecha_instalacion,
+            "ultimo_mantenimiento": s.ultimo_mantenimiento,
+            "proximo_mantenimiento": s.proximo_mantenimiento,
+            "fecha_eol": s.fecha_eol,
+            "fin_garantia_contrato": s.fin_garantia_contrato,
+            "proveedor_soporte": s.proveedor_soporte or "",
+            "numero_contrato": s.numero_contrato or ""
         }
     return None
 

@@ -63,6 +63,14 @@ class UPSBase(BaseModel):
     serial: Optional[str] = ""
     fecha_fabricacion: Optional[date] = None
     fecha_cambio_baterias: Optional[date] = None
+    proximo_cambio_baterias: Optional[date] = None
+    fecha_instalacion: Optional[date] = None
+    ultimo_mantenimiento: Optional[date] = None
+    proximo_mantenimiento: Optional[date] = None
+    fecha_eol: Optional[date] = None
+    fin_garantia_contrato: Optional[date] = None
+    proveedor_soporte: Optional[str] = ""
+    numero_contrato: Optional[str] = ""
     ip: Optional[str] = ""
     vlan: Optional[str] = ""
     capacidad_kva: Optional[float] = 10.0
@@ -80,6 +88,14 @@ class UPSUpdate(BaseModel):
     serial: Optional[str] = None
     fecha_fabricacion: Optional[date] = None
     fecha_cambio_baterias: Optional[date] = None
+    proximo_cambio_baterias: Optional[date] = None
+    fecha_instalacion: Optional[date] = None
+    ultimo_mantenimiento: Optional[date] = None
+    proximo_mantenimiento: Optional[date] = None
+    fecha_eol: Optional[date] = None
+    fin_garantia_contrato: Optional[date] = None
+    proveedor_soporte: Optional[str] = None
+    numero_contrato: Optional[str] = None
     ip: Optional[str] = None
     vlan: Optional[str] = None
     capacidad_kva: Optional[float] = None
@@ -96,6 +112,14 @@ class UPSResponse(BaseModel):
     serial: Optional[str] = ""
     fecha_fabricacion: Optional[date] = None
     fecha_cambio_baterias: Optional[date] = None
+    proximo_cambio_baterias: Optional[date] = None
+    fecha_instalacion: Optional[date] = None
+    ultimo_mantenimiento: Optional[date] = None
+    proximo_mantenimiento: Optional[date] = None
+    fecha_eol: Optional[date] = None
+    fin_garantia_contrato: Optional[date] = None
+    proveedor_soporte: Optional[str] = ""
+    numero_contrato: Optional[str] = ""
     ip: Optional[str] = ""
     vlan: Optional[str] = ""
     capacidad_kva: Optional[float] = 0.0
@@ -137,6 +161,13 @@ class SwitchBase(BaseModel):
     modelo: Optional[str] = ""
     serial: Optional[str] = ""
     vlan_gestion: Optional[str] = "1"
+    fecha_instalacion: Optional[date] = None
+    ultimo_mantenimiento: Optional[date] = None
+    proximo_mantenimiento: Optional[date] = None
+    fecha_eol: Optional[date] = None
+    fin_garantia_contrato: Optional[date] = None
+    proveedor_soporte: Optional[str] = ""
+    numero_contrato: Optional[str] = ""
 
 class SwitchCreate(SwitchBase):
     pass
@@ -150,6 +181,13 @@ class SwitchUpdate(BaseModel):
     modelo: Optional[str] = None
     serial: Optional[str] = None
     vlan_gestion: Optional[str] = None
+    fecha_instalacion: Optional[date] = None
+    ultimo_mantenimiento: Optional[date] = None
+    proximo_mantenimiento: Optional[date] = None
+    fecha_eol: Optional[date] = None
+    fin_garantia_contrato: Optional[date] = None
+    proveedor_soporte: Optional[str] = None
+    numero_contrato: Optional[str] = None
 
 class SwitchResponse(BaseModel):
     id: int
@@ -162,6 +200,13 @@ class SwitchResponse(BaseModel):
     modelo: Optional[str] = ""
     serial: Optional[str] = ""
     vlan_gestion: Optional[str] = "1"
+    fecha_instalacion: Optional[date] = None
+    ultimo_mantenimiento: Optional[date] = None
+    proximo_mantenimiento: Optional[date] = None
+    fecha_eol: Optional[date] = None
+    fin_garantia_contrato: Optional[date] = None
+    proveedor_soporte: Optional[str] = ""
+    numero_contrato: Optional[str] = ""
     class Config:
         from_attributes = True
 
@@ -180,6 +225,13 @@ class HostBase(BaseModel):
     rol: Optional[str] = "Otro"
     puerto_switch: Optional[str] = ""
     sector_planta: Optional[str] = ""
+    fecha_instalacion: Optional[date] = None
+    ultimo_mantenimiento: Optional[date] = None
+    proximo_mantenimiento: Optional[date] = None
+    fecha_eol: Optional[date] = None
+    fin_garantia_contrato: Optional[date] = None
+    proveedor_soporte: Optional[str] = ""
+    numero_contrato: Optional[str] = ""
 
 class HostCreate(HostBase):
     pass
@@ -196,6 +248,13 @@ class HostUpdate(BaseModel):
     rol: Optional[str] = None
     puerto_switch: Optional[str] = None
     sector_planta: Optional[str] = None
+    fecha_instalacion: Optional[date] = None
+    ultimo_mantenimiento: Optional[date] = None
+    proximo_mantenimiento: Optional[date] = None
+    fecha_eol: Optional[date] = None
+    fin_garantia_contrato: Optional[date] = None
+    proveedor_soporte: Optional[str] = None
+    numero_contrato: Optional[str] = None
 
 class HostResponse(BaseModel):
     id: int
@@ -211,6 +270,13 @@ class HostResponse(BaseModel):
     rol: Optional[str] = "Otro"
     puerto_switch: Optional[str] = None
     sector_planta: Optional[str] = None
+    fecha_instalacion: Optional[date] = None
+    ultimo_mantenimiento: Optional[date] = None
+    proximo_mantenimiento: Optional[date] = None
+    fecha_eol: Optional[date] = None
+    fin_garantia_contrato: Optional[date] = None
+    proveedor_soporte: Optional[str] = ""
+    numero_contrato: Optional[str] = ""
     class Config:
         from_attributes = True
 
@@ -227,6 +293,13 @@ class ServidorBase(BaseModel):
     ip: Optional[str] = "0.0.0.0"
     tipo_servidor: Optional[str] = "Virtual (VM)"
     sistema_operativo: Optional[str] = "Linux RHEL"
+    fecha_instalacion: Optional[date] = None
+    ultimo_mantenimiento: Optional[date] = None
+    proximo_mantenimiento: Optional[date] = None
+    fecha_eol: Optional[date] = None
+    fin_garantia_contrato: Optional[date] = None
+    proveedor_soporte: Optional[str] = ""
+    numero_contrato: Optional[str] = ""
 
 class ServidorCreate(ServidorBase):
     pass
@@ -241,6 +314,13 @@ class ServidorUpdate(BaseModel):
     ip: Optional[str] = None
     tipo_servidor: Optional[str] = None
     sistema_operativo: Optional[str] = None
+    fecha_instalacion: Optional[date] = None
+    ultimo_mantenimiento: Optional[date] = None
+    proximo_mantenimiento: Optional[date] = None
+    fecha_eol: Optional[date] = None
+    fin_garantia_contrato: Optional[date] = None
+    proveedor_soporte: Optional[str] = None
+    numero_contrato: Optional[str] = None
 
 class ServidorResponse(BaseModel):
     id: int
@@ -254,6 +334,13 @@ class ServidorResponse(BaseModel):
     ip: Optional[str] = "0.0.0.0"
     tipo_servidor: Optional[str] = "Virtual (VM)"
     sistema_operativo: Optional[str] = "Linux RHEL"
+    fecha_instalacion: Optional[date] = None
+    ultimo_mantenimiento: Optional[date] = None
+    proximo_mantenimiento: Optional[date] = None
+    fecha_eol: Optional[date] = None
+    fin_garantia_contrato: Optional[date] = None
+    proveedor_soporte: Optional[str] = ""
+    numero_contrato: Optional[str] = ""
     class Config:
         from_attributes = True
 
