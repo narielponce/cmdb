@@ -57,6 +57,7 @@ class BlindobarraResponse(BaseModel):
 class UPSBase(BaseModel):
     nombre: str
     blindobarra_id: int
+    checkmk_host_id: Optional[str] = None
     marca: Optional[str] = ""
     modelo: Optional[str] = ""
     serial: Optional[str] = ""
@@ -73,6 +74,7 @@ class UPSCreate(UPSBase):
 class UPSUpdate(BaseModel):
     nombre: Optional[str] = None
     blindobarra_id: Optional[int] = None
+    checkmk_host_id: Optional[str] = None
     marca: Optional[str] = None
     modelo: Optional[str] = None
     serial: Optional[str] = None
@@ -88,6 +90,7 @@ class UPSResponse(BaseModel):
     nombre: str
     blindobarra_id: Optional[int] = None
     blindobarra_nombre: Optional[str] = None
+    checkmk_host_id: Optional[str] = None
     marca: Optional[str] = ""
     modelo: Optional[str] = ""
     serial: Optional[str] = ""
@@ -128,6 +131,7 @@ class RackResponse(BaseModel):
 class SwitchBase(BaseModel):
     nombre: str
     ip: Optional[str] = "0.0.0.0"
+    checkmk_host_id: Optional[str] = None
     rack_id: Optional[int] = None
     marca: Optional[str] = ""
     modelo: Optional[str] = ""
@@ -140,6 +144,7 @@ class SwitchCreate(SwitchBase):
 class SwitchUpdate(BaseModel):
     nombre: Optional[str] = None
     ip: Optional[str] = None
+    checkmk_host_id: Optional[str] = None
     rack_id: Optional[int] = None
     marca: Optional[str] = None
     modelo: Optional[str] = None
@@ -150,6 +155,7 @@ class SwitchResponse(BaseModel):
     id: int
     nombre: str
     ip: Optional[str] = "0.0.0.0"
+    checkmk_host_id: Optional[str] = None
     rack_id: Optional[int] = None
     rack_nombre: Optional[str] = None
     marca: Optional[str] = ""
@@ -165,6 +171,7 @@ class SwitchResponse(BaseModel):
 class HostBase(BaseModel):
     nombre: str
     ip: Optional[str] = "0.0.0.0"
+    checkmk_host_id: Optional[str] = None
     switch_id: Optional[int] = None
     marca: Optional[str] = ""
     modelo: Optional[str] = ""
@@ -180,6 +187,7 @@ class HostCreate(HostBase):
 class HostUpdate(BaseModel):
     nombre: Optional[str] = None
     ip: Optional[str] = None
+    checkmk_host_id: Optional[str] = None
     switch_id: Optional[int] = None
     marca: Optional[str] = None
     modelo: Optional[str] = None
@@ -193,6 +201,7 @@ class HostResponse(BaseModel):
     id: int
     nombre: str
     ip: Optional[str] = "0.0.0.0"
+    checkmk_host_id: Optional[str] = None
     switch_id: Optional[int] = None
     switch_nombre: Optional[str] = None
     marca: Optional[str] = ""
@@ -211,6 +220,7 @@ class HostResponse(BaseModel):
 class ServidorBase(BaseModel):
     nombre: str
     switch_id: Optional[int] = None
+    checkmk_host_id: Optional[str] = None
     marca: Optional[str] = ""
     modelo: Optional[str] = ""
     serial: Optional[str] = ""
@@ -224,6 +234,7 @@ class ServidorCreate(ServidorBase):
 class ServidorUpdate(BaseModel):
     nombre: Optional[str] = None
     switch_id: Optional[int] = None
+    checkmk_host_id: Optional[str] = None
     marca: Optional[str] = None
     modelo: Optional[str] = None
     serial: Optional[str] = None
@@ -236,6 +247,7 @@ class ServidorResponse(BaseModel):
     nombre: str
     switch_id: Optional[int] = None
     switch_nombre: Optional[str] = None
+    checkmk_host_id: Optional[str] = None
     marca: Optional[str] = ""
     modelo: Optional[str] = ""
     serial: Optional[str] = ""

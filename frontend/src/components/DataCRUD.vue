@@ -209,6 +209,7 @@
               <th>Marca</th>
               <th>Modelo</th>
               <th>Nro Serie</th>
+              <th>ID Checkmk</th>
               <th style="width: 120px;">Acciones</th>
             </tr>
             <tr v-else-if="activeTab === 'racks'">
@@ -224,6 +225,7 @@
               <th>Nro Serie</th>
               <th>IP Gestión</th>
               <th>VLAN</th>
+              <th>ID Checkmk</th>
               <th style="width: 100px;">Acciones</th>
             </tr>
             <tr v-else-if="activeTab === 'hosts'">
@@ -233,6 +235,7 @@
               <th>Conectado a</th>
               <th>Rol</th>
               <th>Ubicación</th>
+              <th>ID Checkmk</th>
               <th style="width: 120px;">Acciones</th>
             </tr>
             <tr v-else-if="activeTab === 'servidores'">
@@ -244,6 +247,7 @@
               <th>IP</th>
               <th>Tipo</th>
               <th>Sistema Operativo</th>
+              <th>ID Checkmk</th>
               <th style="width: 100px;">Acciones</th>
             </tr>
             <tr v-else-if="activeTab === 'aplicaciones'">
@@ -322,6 +326,7 @@
                 </td>
                 <td><input type="text" class="editable-cell" v-model="item.modelo" /></td>
                 <td><input type="text" class="editable-cell" v-model="item.serial" /></td>
+                <td><input type="text" class="editable-cell" v-model="item.checkmk_host_id" placeholder="Nombre en Checkmk" /></td>
               </template>
 
               <!-- RACKS -->
@@ -352,6 +357,7 @@
                 <td><input type="text" class="editable-cell" v-model="item.serial" /></td>
                 <td><input type="text" class="editable-cell" v-model="item.ip" /></td>
                 <td><input type="text" class="editable-cell" v-model="item.vlan_gestion" /></td>
+                <td><input type="text" class="editable-cell" v-model="item.checkmk_host_id" placeholder="Nombre en Checkmk" /></td>
               </template>
 
               <!-- HOSTS -->
@@ -374,6 +380,7 @@
                   </select>
                 </td>
                 <td><input type="text" class="editable-cell" v-model="item.ubicacion" /></td>
+                <td><input type="text" class="editable-cell" v-model="item.checkmk_host_id" placeholder="Nombre en Checkmk" /></td>
               </template>
 
               <!-- SERVIDORES -->
@@ -412,6 +419,7 @@
                     <option value="Otro">Otro</option>
                   </select>
                 </td>
+                <td><input type="text" class="editable-cell" v-model="item.checkmk_host_id" placeholder="Nombre en Checkmk" /></td>
               </template>
 
               <!-- APLICACIONES -->
@@ -1135,7 +1143,8 @@ export default {
             capacidad_kva: 10.0,
             estado_baterias: 'Ok',
             ip: '0.0.0.0',
-            vlan: '1'
+            vlan: '1',
+            checkmk_host_id: ''
           }
           break
         case 'racks':
@@ -1152,7 +1161,8 @@ export default {
             modelo: '',
             serial: '',
             ip: '0.0.0.0',
-            vlan_gestion: '1'
+            vlan_gestion: '1',
+            checkmk_host_id: ''
           }
           break
         case 'hosts':
@@ -1164,7 +1174,8 @@ export default {
             serial: '',
             ip: '0.0.0.0',
             rol: 'Otro',
-            ubicacion: ''
+            ubicacion: '',
+            checkmk_host_id: ''
           }
           break
         case 'servidores':
@@ -1176,7 +1187,8 @@ export default {
             serial: '',
             ip: '0.0.0.0',
             tipo_servidor: 'Virtual (VM)',
-            sistema_operativo: 'Linux RHEL'
+            sistema_operativo: 'Linux RHEL',
+            checkmk_host_id: ''
           }
           break
         case 'aplicaciones':

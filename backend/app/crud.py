@@ -279,7 +279,8 @@ def get_ups_all(db: Session):
             "ip": u.ip,
             "vlan": u.vlan,
             "capacidad_kva": u.capacidad_kva or 0.0,
-            "estado_baterias": u.estado.nombre if u.estado else "Ok"
+            "estado_baterias": u.estado.nombre if u.estado else "Ok",
+            "checkmk_host_id": u.checkmk_host_id
         })
     return mapped
 
@@ -299,7 +300,8 @@ def get_ups(db: Session, ups_id: int):
             "ip": u.ip,
             "vlan": u.vlan,
             "capacidad_kva": u.capacidad_kva or 0.0,
-            "estado_baterias": u.estado.nombre if u.estado else "Ok"
+            "estado_baterias": u.estado.nombre if u.estado else "Ok",
+            "checkmk_host_id": u.checkmk_host_id
         }
     return None
 
@@ -403,7 +405,8 @@ def get_switches(db: Session):
             "marca": s.marca.nombre if s.marca else "",
             "modelo": s.modelo,
             "serial": s.serial,
-            "vlan_gestion": s.vlan
+            "vlan_gestion": s.vlan,
+            "checkmk_host_id": s.checkmk_host_id
         })
     return mapped
 
@@ -419,7 +422,8 @@ def get_switch(db: Session, sw_id: int):
             "marca": s.marca.nombre if s.marca else "",
             "modelo": s.modelo,
             "serial": s.serial,
-            "vlan_gestion": s.vlan
+            "vlan_gestion": s.vlan,
+            "checkmk_host_id": s.checkmk_host_id
         }
     return None
 
@@ -485,7 +489,8 @@ def get_hosts(db: Session):
             "ubicacion": h.ubicacion,
             "rol": h.tipo_host.nombre if h.tipo_host else "Host",
             "puerto_switch": h.puerto_switch,
-            "sector_planta": h.ubicacion
+            "sector_planta": h.ubicacion,
+            "checkmk_host_id": h.checkmk_host_id
         })
     return mapped
 
@@ -504,7 +509,8 @@ def get_host(db: Session, host_id: int):
             "ubicacion": h.ubicacion,
             "rol": h.tipo_host.nombre if h.tipo_host else "Host",
             "puerto_switch": h.puerto_switch,
-            "sector_planta": h.ubicacion
+            "sector_planta": h.ubicacion,
+            "checkmk_host_id": h.checkmk_host_id
         }
     return None
 
@@ -573,7 +579,8 @@ def get_servidores(db: Session):
             "serial": s.serial,
             "ip": s.ip,
             "tipo_servidor": s.tipo_servidor.nombre if s.tipo_servidor else "Virtual (VM)",
-            "sistema_operativo": s.sistema_operativo or ""
+            "sistema_operativo": s.sistema_operativo or "",
+            "checkmk_host_id": s.checkmk_host_id
         })
     return mapped
 
@@ -590,7 +597,8 @@ def get_servidor(db: Session, srv_id: int):
             "serial": s.serial,
             "ip": s.ip,
             "tipo_servidor": s.tipo_servidor.nombre if s.tipo_servidor else "Virtual (VM)",
-            "sistema_operativo": s.sistema_operativo or ""
+            "sistema_operativo": s.sistema_operativo or "",
+            "checkmk_host_id": s.checkmk_host_id
         }
     return None
 
