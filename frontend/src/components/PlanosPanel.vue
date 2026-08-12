@@ -87,15 +87,22 @@
             Ningún equipo disponible para ubicar.
           </div>
           <div 
-            v-else
             v-for="item in filteredUnplacedItems" 
             :key="item.type + '-' + item.id"
             draggable="true"
             @dragstart="startDrag($event, item)"
             class="flex items-center gap-2.5 p-2 rounded-lg border border-slate-200 bg-white hover:border-primary/50 hover:shadow-sm cursor-grab transition active:cursor-grabbing text-xs"
+            :title="item.nombre + ' - Estado: ' + (item.estado || 'Ok')"
           >
-            <div :class="['w-7 h-7 rounded-full flex items-center justify-center text-sm shadow-sm shrink-0', getTypeColorClass(item.tipo)]">
-              {{ getTypeIcon(item.tipo) }}
+            <div 
+              :class="[
+                'w-7 h-7 rounded-full flex items-center justify-center text-xs shadow-sm shrink-0', 
+                item.estado === 'Crítico' 
+                  ? 'bg-red-600 text-white border border-red-400 animate-pulse shadow-sm shadow-red-600/40' 
+                  : getTypeColorClass(item.tipo)
+              ]"
+            >
+              {{ item.estado === 'Crítico' ? '⚠️' : getTypeIcon(item.tipo) }}
             </div>
             <div class="flex-1 min-w-0">
               <p class="font-bold text-slate-800 truncate mb-0.5" :title="item.nombre">{{ item.nombre }}</p>
@@ -207,11 +214,18 @@
               draggable="true"
               @dragstart="startDrag($event, item)"
               @dblclick="unplaceItem(item)"
-              :title="item.nombre + ' (' + item.tipo + ') - Doble click para remover'"
+              :title="item.nombre + ' (' + item.tipo + ') - Estado: ' + (item.estado || 'Ok') + ' - Doble click para remover'"
             >
               <!-- Colored Circle pin -->
-              <div :class="['w-10 h-10 rounded-full flex items-center justify-center text-lg shadow-lg border-2 border-white ring-4 transition transform hover:scale-110 active:scale-95 cursor-grab', getTypeColorClass(item.tipo), 'ring-slate-900/10']">
-                {{ getTypeIcon(item.tipo) }}
+              <div 
+                :class="[
+                  'w-10 h-10 rounded-full flex items-center justify-center text-lg shadow-lg border-2 transition transform hover:scale-110 active:scale-95 cursor-grab',
+                  item.estado === 'Crítico' 
+                    ? 'bg-red-600 text-white border-red-400 ring-4 ring-red-500/50 animate-pulse shadow-lg shadow-red-600/40' 
+                    : (getTypeColorClass(item.tipo) + ' border-white ring-4 ring-slate-900/10')
+                ]"
+              >
+                {{ item.estado === 'Crítico' ? '⚠️' : getTypeIcon(item.tipo) }}
               </div>
               
               <!-- Floating label -->

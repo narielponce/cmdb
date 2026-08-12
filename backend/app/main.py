@@ -1361,6 +1361,7 @@ def serialize_host_for_plano(h):
         "nombre": h.nombre,
         "ip": h.ip,
         "tipo": tipo,
+        "estado": h.estado.nombre if h.estado else "Ok",
         "x": h.plano_x,
         "y": h.plano_y,
         "plano_id": h.plano_id,
@@ -1644,6 +1645,15 @@ def checkmk_webhook_receiver(payload: CheckmkWebhookPayload, db: Session = Depen
             status_code=404, 
             detail=f"Host '{payload.host_name}' no encontrado en la base de datos de NetTrack"
         )
+        
+    # 2. Update the host state in the database based on the received webhook state
+    state = payload.host_state.upper()
+    if state in ["DOWN", "CRITICAL"]:
+        host.estado_id = 3  # "Crítico"
+    elif state == "UP":
+        host.estado_id = 1  # "Ok"
+    db.commit()
+    db.refresh(host)
         
     affected_nodes = {
         "blindobarras": [],
