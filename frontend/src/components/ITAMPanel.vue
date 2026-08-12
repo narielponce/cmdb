@@ -283,7 +283,39 @@
           </button>
         </div>
 
-        <div class="table-container">
+        <!-- Filtros y Búsqueda de Consumibles -->
+        <div style="display: flex; gap: 1.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; align-items: flex-end;">
+          <div class="form-group" style="margin-bottom: 0; min-width: 280px; flex-grow: 1;">
+            <label class="form-label" for="search-consumible">Buscar insumo (Marca o Modelo):</label>
+            <input 
+              id="search-consumible" 
+              type="text" 
+              class="form-input" 
+              v-model="searchConsumibles" 
+              placeholder="Ej: Cisco, Fiber, Patchcord..." 
+              style="margin-top: 0.25rem;"
+            />
+          </div>
+          <div class="form-group" style="margin-bottom: 0; min-width: 200px;">
+            <label class="form-label" for="category-consumible">Filtrar por Categoría:</label>
+            <select 
+              id="category-consumible" 
+              class="form-select" 
+              v-model="categoryFilterConsumibles"
+              style="margin-top: 0.25rem;"
+            >
+              <option value="todos">Todas las categorías</option>
+              <option value="Patchcord CO">Patchcord CO</option>
+              <option value="Patchcord FO">Patchcord FO</option>
+              <option value="TransceptorSFP">TransceptorSFP</option>
+              <option value="Conector">Conector</option>
+              <option value="Herramienta">Herramienta</option>
+              <option value="Otro">Otro</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="table-container" v-if="filteredConsumibles.length > 0">
           <table class="custom-table" :class="{ 'readonly-mode': !canWrite }">
             <thead>
               <tr>
@@ -297,7 +329,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(item, index) in stockConsumibles" :key="item.id || index">
+              <tr v-for="(item, index) in paginatedConsumibles" :key="item.id || index">
                 <td>
                   <input type="text" class="editable-cell" v-model="item.marca" @change="item.editado = true" />
                 </td>
@@ -332,7 +364,7 @@
                     <button class="crud-btn" title="Guardar Fila" @click="guardarFilaConsumible(item)">
                       💾
                     </button>
-                    <button class="crud-btn" title="Eliminar Fila" @click="eliminarFilaConsumible(item, index)">
+                    <button class="crud-btn" title="Eliminar Fila" @click="eliminarFilaConsumible(item)">
                       🗑️
                     </button>
                   </div>
@@ -341,6 +373,54 @@
               </tr>
             </tbody>
           </table>
+        </div>
+        <div v-else-if="loadingConsumibles" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+          Cargando consumibles...
+        </div>
+        <div v-else style="text-align: center; padding: 2rem; color: var(--warning);">
+          No se encontraron consumibles con los filtros seleccionados.
+        </div>
+
+        <!-- Controles de Paginación para Consumibles -->
+        <div v-if="filteredConsumibles.length > 0" class="flex flex-col sm:flex-row justify-between items-center gap-4 mt-4 bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div class="text-sm text-slate-600 font-medium">
+            Mostrando {{ (currentConsumiblesPage - 1) * consumiblesPageSize + 1 }} - {{ Math.min(currentConsumiblesPage * consumiblesPageSize, filteredConsumibles.length) }} de {{ filteredConsumibles.length }} registros
+          </div>
+          <div class="flex items-center gap-1">
+            <button 
+              @click="currentConsumiblesPage > 1 && (currentConsumiblesPage--)" 
+              :disabled="currentConsumiblesPage === 1"
+              class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none transition text-sm font-medium shadow-sm"
+            >
+              ◀ Anterior
+            </button>
+            
+            <button 
+              v-for="p in visibleConsumiblesPages" 
+              :key="p"
+              @click="currentConsumiblesPage = p"
+              :class="['px-3 py-1.5 rounded-lg text-sm font-semibold transition shadow-sm', p === currentConsumiblesPage ? 'bg-primary text-white' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50']"
+            >
+              {{ p }}
+            </button>
+
+            <button 
+              @click="currentConsumiblesPage < totalConsumiblesPages && (currentConsumiblesPage++)" 
+              :disabled="currentConsumiblesPage === totalConsumiblesPages"
+              class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none transition text-sm font-medium shadow-sm"
+            >
+              Siguiente ▶
+            </button>
+          </div>
+          <div class="flex items-center gap-2 text-sm text-slate-600 font-medium">
+            Filas por página:
+            <select v-model="consumiblesPageSize" class="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-slate-700 font-semibold shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20">
+              <option :value="5">5</option>
+              <option :value="10">10</option>
+              <option :value="20">20</option>
+              <option :value="50">50</option>
+            </select>
+          </div>
         </div>
       </div>
     </div>
@@ -443,12 +523,21 @@ export default {
 
     watch(activeTab, () => {
       currentPage.value = 1
+      currentConsumiblesPage.value = 1
     })
     const tiposEquipos = ["🔌 Switch", "🔋 UPS", "📶 Access Point", "📷 Cámara IP", "⚙️ Host Industrial"]
 
     // Consumibles State
     const stockConsumibles = ref([])
     const loadingConsumibles = ref(false)
+    const searchConsumibles = ref('')
+    const categoryFilterConsumibles = ref('todos')
+    const currentConsumiblesPage = ref(1)
+    const consumiblesPageSize = ref(10)
+
+    watch([searchConsumibles, categoryFilterConsumibles], () => {
+      currentConsumiblesPage.value = 1
+    })
 
     // History State
     const historial = ref([])
@@ -512,6 +601,49 @@ export default {
       } else {
         return switches.value
       }
+    })
+
+    const filteredConsumibles = computed(() => {
+      let data = stockConsumibles.value
+      
+      // Filter by category
+      if (categoryFilterConsumibles.value && categoryFilterConsumibles.value !== 'todos') {
+        data = data.filter(item => item.tipo === categoryFilterConsumibles.value)
+      }
+      
+      // Filter by search term
+      if (searchConsumibles.value) {
+        const query = searchConsumibles.value.toLowerCase().trim()
+        data = data.filter(item => {
+          const marca = (item.marca || '').toLowerCase()
+          const modelo = (item.modelo || '').toLowerCase()
+          return marca.includes(query) || modelo.includes(query)
+        })
+      }
+      
+      return data
+    })
+
+    const totalConsumiblesPages = computed(() => Math.ceil(filteredConsumibles.value.length / consumiblesPageSize.value) || 1)
+
+    const paginatedConsumibles = computed(() => {
+      const start = (currentConsumiblesPage.value - 1) * consumiblesPageSize.value
+      const end = start + consumiblesPageSize.value
+      return filteredConsumibles.value.slice(start, end)
+    })
+
+    const visibleConsumiblesPages = computed(() => {
+      const pages = []
+      const maxVisible = 5
+      let start = Math.max(1, currentConsumiblesPage.value - 2)
+      let end = Math.min(totalConsumiblesPages.value, start + maxVisible - 1)
+      if (end - start + 1 < maxVisible) {
+        start = Math.max(1, end - maxVisible + 1)
+      }
+      for (let i = start; i <= end; i++) {
+        pages.push(i)
+      }
+      return pages
     })
 
     const consumiblesDisponibles = computed(() => {
@@ -700,6 +832,11 @@ export default {
 
     // Tab 3 Consumible Flat grid edit methods
     const agregarFilaConsumible = () => {
+      // Reset filters so the new row is visible
+      searchConsumibles.value = ''
+      categoryFilterConsumibles.value = 'todos'
+      currentConsumiblesPage.value = 1
+
       stockConsumibles.value.unshift({
         id: null,
         marca: '',
@@ -729,14 +866,17 @@ export default {
       }
     }
 
-    const eliminarFilaConsumible = async (item, index) => {
+    const eliminarFilaConsumible = async (item) => {
       if (!confirm("¿Está seguro de eliminar este insumo?")) return
       
       try {
         if (item.id) {
           await axios.delete(`/api/consumibles/${item.id}`)
         }
-        stockConsumibles.value.splice(index, 1)
+        const idx = stockConsumibles.value.findIndex(c => c === item)
+        if (idx !== -1) {
+          stockConsumibles.value.splice(idx, 1)
+        }
         alert("Insumo eliminado.")
       } catch (error) {
         console.error("Error deleting consumable", error)
@@ -793,6 +933,10 @@ export default {
       tiposEquipos,
       stockConsumibles,
       loadingConsumibles,
+      searchConsumibles,
+      categoryFilterConsumibles,
+      currentConsumiblesPage,
+      consumiblesPageSize,
       historial,
       loadingHistorial,
       racks,
@@ -809,6 +953,10 @@ export default {
       pageSize,
       totalPages,
       visiblePages,
+      filteredConsumibles,
+      totalConsumiblesPages,
+      paginatedConsumibles,
+      visibleConsumiblesPages,
       equiposDeposito,
       destinosFiltrados,
       consumiblesDisponibles,

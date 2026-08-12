@@ -137,6 +137,8 @@ El frontend utiliza una estrategia híbrida para integrar Tailwind CSS v3 de for
     *   `.btn`: Unifica las dimensiones físicas y micro-sombras de los botones.
 *   **Layout Responsivo**:
     *   A partir de un ancho menor o igual a **`992px`**, el menú lateral se reubica automáticamente en formato horizontal superior, las grillas de dos y tres columnas colapsan a una única columna vertical, y los márgenes se compactan para un uso cómodo en pantallas móviles.
+*   **Paginación y Filtros Interactivos (ITAM)**:
+    *   Tanto el listado de consolidado de equipos como el catálogo de stock de consumibles implementan lógica de paginación del lado del cliente con tamaño de página configurable, campos de búsqueda interactiva (por marca/modelo) y filtros de categoría reactivos. Esto garantiza un acceso fluido a registros masivos sin saturar la comunicación con la API.
 
 ---
 
