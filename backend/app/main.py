@@ -1633,6 +1633,21 @@ class CheckmkWebhookPayload(BaseModel):
     host_state: str
     service_state: Optional[str] = None
 
+def get_downstream_host_ids(db: Session, host: models.Host) -> List[int]:
+    affected_ids = []
+    tipo = host.tipo_host.nombre if host.tipo_host else ""
+    if tipo == "UPS":
+        res = simulator.simular_corte_ups(db, host.id)
+        for item in res.get("hosts", []):
+            affected_ids.append(item["id"])
+        for item in res.get("servidores", []):
+            affected_ids.append(item["id"])
+    elif tipo == "Switch":
+        downstream = db.query(models.Host).filter(models.Host.switch_id == host.id).all()
+        for h in downstream:
+            affected_ids.append(h.id)
+    return affected_ids
+
 @app.post("/api/v1/integrations/checkmk/webhook")
 def checkmk_webhook_receiver(payload: CheckmkWebhookPayload, db: Session = Depends(get_db)):
     # 1. Identify the affected node (by checkmk_host_id first, then fallback to nombre)
@@ -1646,12 +1661,19 @@ def checkmk_webhook_receiver(payload: CheckmkWebhookPayload, db: Session = Depen
             detail=f"Host '{payload.host_name}' no encontrado en la base de datos de NetTrack"
         )
         
-    # 2. Update the host state in the database based on the received webhook state
+    # 2. Update the host state and its downstream cascade in the database
     state = payload.host_state.upper()
+    affected_host_ids = get_downstream_host_ids(db, host)
+    
     if state in ["DOWN", "CRITICAL"]:
         host.estado_id = 3  # "Crítico"
+        if affected_host_ids:
+            db.query(models.Host).filter(models.Host.id.in_(affected_host_ids)).update({"estado_id": 3}, synchronize_session=False)
     elif state == "UP":
         host.estado_id = 1  # "Ok"
+        if affected_host_ids:
+            db.query(models.Host).filter(models.Host.id.in_(affected_host_ids)).update({"estado_id": 1}, synchronize_session=False)
+            
     db.commit()
     db.refresh(host)
         

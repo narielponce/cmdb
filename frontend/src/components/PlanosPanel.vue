@@ -297,7 +297,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import axios from 'axios'
 
 export default {
@@ -693,9 +693,24 @@ export default {
       )
     })
 
+    let pollingInterval = null
+
     onMounted(() => {
       loadUserPermissions()
       fetchPlanos()
+      
+      // Poll every 4 seconds to update device states in real-time
+      pollingInterval = setInterval(() => {
+        if (selectedPlano.value && !showModal.value && !savingPositions.value) {
+          fetchPlanoItems(selectedPlano.value.id)
+        }
+      }, 4000)
+    })
+
+    onBeforeUnmount(() => {
+      if (pollingInterval) {
+        clearInterval(pollingInterval)
+      }
     })
 
     return {
