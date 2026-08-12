@@ -65,6 +65,7 @@ class Host(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String, unique=True, nullable=False)
+    checkmk_host_id = Column(String, unique=True, index=True, nullable=True)
     
     # FKs to support tables
     tipo_host_id = Column(Integer, ForeignKey("tipos_host.id", ondelete="RESTRICT"), nullable=False)

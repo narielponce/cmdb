@@ -177,3 +177,34 @@ sequenceDiagram
 
 ### Limpieza de Base de Datos
 En entorno local de desarrollo, el esquema público de la base de datos PostgreSQL se limpia y recrea de forma automática en cada arranque para mantener la coherencia del semillado de datos de prueba.
+
+---
+
+## 8. Integración con Checkmk (Monitoreo e Impacto)
+
+NetTrack expone un endpoint receptor de webhooks diseñado para integrarse directamente con las notificaciones de alertas de **Checkmk**.
+
+### Mapeo de Identificadores
+Para vincular los hosts de la planta física monitorizados en Checkmk con el Gemelo Digital en NetTrack, se añade el campo `checkmk_host_id` a la tabla `hosts`. Al procesar un webhook:
+1. Se busca una coincidencia exacta de `host_name` de Checkmk contra la columna `checkmk_host_id`.
+2. Si no existe, se realiza un fallback buscando por la columna `nombre` (hostname).
+
+### Endpoint del Webhook
+*   **Ruta**: `POST /api/v1/integrations/checkmk/webhook`
+*   **Seguridad**: Bypass total de autenticación JWT (ruta exenta en middleware global) para facilitar el envío directo desde Checkmk.
+*   **Payload Aceptado**:
+    ```json
+    {
+      "host_name": "switch_central_1",
+      "host_state": "DOWN",
+      "service_state": null
+    }
+    ```
+
+### Propagación de Fallas
+Cuando se recibe un estado `DOWN` o `CRITICAL`:
+- **UPS**: Ejecuta la simulación en cascada afectando racks, switches, hosts de red y servidores alimentados.
+- **Switch**: Afecta todos los hosts de red y servidores conectados directamente a sus puertos, calculando además las aplicaciones de software caídas y procesos de planta detenidos.
+- **Servidor**: Ejecuta la simulación de mantenimiento del servidor, calculando el impacto en sistemas de software (SCADA/MES) y líneas de producción.
+- **Hosts**: Se registran como inoperativos sin impacto secundario.
+

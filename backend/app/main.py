@@ -19,11 +19,12 @@ with engine.connect() as conn:
         conn.execute(text("ALTER TABLE hosts ADD COLUMN IF NOT EXISTS plano_id INTEGER;"))
         conn.execute(text("ALTER TABLE hosts ADD COLUMN IF NOT EXISTS plano_x FLOAT;"))
         conn.execute(text("ALTER TABLE hosts ADD COLUMN IF NOT EXISTS plano_y FLOAT;"))
+        conn.execute(text("ALTER TABLE hosts ADD COLUMN IF NOT EXISTS checkmk_host_id VARCHAR;"))
         conn.execute(text("ALTER TABLE racks ADD COLUMN IF NOT EXISTS plano_id INTEGER;"))
         conn.execute(text("ALTER TABLE racks ADD COLUMN IF NOT EXISTS plano_x FLOAT;"))
         conn.execute(text("ALTER TABLE racks ADD COLUMN IF NOT EXISTS plano_y FLOAT;"))
         conn.commit()
-        print("🌱 Auto-migration of positioning columns succeeded.")
+        print("🌱 Auto-migration of positioning columns and Checkmk field succeeded.")
     except Exception as e:
         print(f"Skipping auto-migration columns: {e}")
 
@@ -99,7 +100,7 @@ def check_superadmin(user: models.User = Depends(get_current_user)):
 
 def check_global_permission(request: Request, db: Session = Depends(get_db)):
     path = request.url.path
-    if path in ["/api/health", "/api/auth/login"] or path.startswith("/static") or path.startswith("/docs") or path.startswith("/redoc") or path == "/openapi.json":
+    if path in ["/api/health", "/api/auth/login", "/api/v1/integrations/checkmk/webhook"] or path.startswith("/static") or path.startswith("/docs") or path.startswith("/redoc") or path == "/openapi.json":
         return
         
     if path.startswith("/api/usuarios") or path.startswith("/api/roles"):
@@ -1619,6 +1620,103 @@ async def import_data(
     return {
         "message": "Proceso de importación finalizado",
         "stats": stats
+    }
+
+# ==========================================
+#    API ENDPOINTS: CHECKMK WEBHOOK INTEGRATION
+# ==========================================
+from pydantic import BaseModel
+
+class CheckmkWebhookPayload(BaseModel):
+    host_name: str
+    host_state: str
+    service_state: Optional[str] = None
+
+@app.post("/api/v1/integrations/checkmk/webhook")
+def checkmk_webhook_receiver(payload: CheckmkWebhookPayload, db: Session = Depends(get_db)):
+    # 1. Identify the affected node (by checkmk_host_id first, then fallback to nombre)
+    host = db.query(models.Host).filter(models.Host.checkmk_host_id == payload.host_name).first()
+    if not host:
+        host = db.query(models.Host).filter(models.Host.nombre == payload.host_name).first()
+        
+    if not host:
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Host '{payload.host_name}' no encontrado en la base de datos de NetTrack"
+        )
+        
+    affected_nodes = {
+        "blindobarras": [],
+        "ups": [],
+        "racks": [],
+        "switches": [],
+        "hosts": [],
+        "servidores": [],
+        "aplicaciones": [],
+        "procesos": []
+    }
+    
+    # 2. If state is DOWN or CRITICAL, run failure propagation BFS
+    state = payload.host_state.upper()
+    if state in ["DOWN", "CRITICAL"]:
+        tipo = host.tipo_host.nombre if host.tipo_host else ""
+        if tipo == "UPS":
+            res = simulator.simular_corte_ups(db, host.id)
+            affected_nodes.update(res)
+        elif tipo == "Switch":
+            # Switch failure propagates to all downstream hosts and servers connected to it
+            downstream_hosts = db.query(models.Host).filter(models.Host.switch_id == host.id).all()
+            hosts_list = []
+            servidores_list = []
+            servidor_ids = []
+            for h in downstream_hosts:
+                h_tipo = h.tipo_host.nombre if h.tipo_host else ""
+                if h_tipo == "Servidor":
+                    servidores_list.append({"id": h.id, "nombre": h.nombre, "ip": h.ip})
+                    servidor_ids.append(h.id)
+                else:
+                    hosts_list.append({"id": h.id, "nombre": h.nombre, "ip": h.ip, "rol": h.rol, "ubicacion": h.ubicacion})
+            
+            aplicaciones = []
+            procesos = []
+            if servidor_ids:
+                deps = db.query(models.DependenciaAppHost).filter(models.DependenciaAppHost.host_id.in_(servidor_ids)).all()
+                app_ids = list(set([d.app_id for d in deps]))
+                if app_ids:
+                    apps = db.query(models.Aplicacion).filter(models.Aplicacion.id.in_(app_ids)).all()
+                    aplicaciones = [{"id": a.id, "nombre": a.nombre, "descripcion": a.descripcion} for a in apps]
+                    
+                    procs = db.query(models.ProcesoPlanta).filter(models.ProcesoPlanta.aplicacion_id.in_(app_ids)).all()
+                    procesos = [
+                        {
+                            "nombre_proceso": p.nombre_proceso, 
+                            "linea_produccion": p.linea_produccion, 
+                            "app_responsable": p.aplicacion.nombre if p.aplicacion else ""
+                        } 
+                        for p in procs
+                    ]
+            
+            affected_nodes["hosts"] = hosts_list
+            affected_nodes["servidores"] = servidores_list
+            affected_nodes["aplicaciones"] = aplicaciones
+            affected_nodes["procesos"] = procesos
+        elif tipo == "Servidor":
+            res = simulator.simular_mantenimiento_servidor(db, host.id)
+            affected_nodes.update(res)
+            
+    return {
+        "status": "success",
+        "source_node": {
+            "id": host.id,
+            "nombre": host.nombre,
+            "tipo": host.tipo_host.nombre if host.tipo_host else "Host",
+            "checkmk_host_id": host.checkmk_host_id
+        },
+        "received_state": {
+            "host_state": payload.host_state,
+            "service_state": payload.service_state
+        },
+        "affected_downstream": affected_nodes
     }
 
 
