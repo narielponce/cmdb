@@ -117,6 +117,17 @@
                 </li>
               </ul>
             </li>
+            <li v-if="hasModule('crud')">
+              <a 
+                href="#" 
+                class="nav-item" 
+                :class="{ active: currentView === 'data_tools' }"
+                @click.prevent="switchView('data_tools')"
+              >
+                <span class="nav-icon">🔄</span>
+                <span>Importar / Exportar</span>
+              </a>
+            </li>
             <li v-if="currentUser.is_superadmin || hasModule('usuarios_roles')">
               <a 
                 href="#" 
@@ -167,6 +178,7 @@ import DataCRUD from './components/DataCRUD.vue'
 import UsuariosRoles from './components/UsuariosRoles.vue'
 import Login from './components/Login.vue'
 import PlanosPanel from './components/PlanosPanel.vue'
+import DataTools from './components/DataTools.vue'
 
 // Set up axios interceptor for 401s globally
 axios.interceptors.response.use(
@@ -191,7 +203,8 @@ export default {
     DataCRUD,
     UsuariosRoles,
     Login,
-    PlanosPanel
+    PlanosPanel,
+    DataTools
   },
   setup() {
     const currentView = ref('dashboard')
@@ -291,9 +304,9 @@ export default {
     ]
 
     const switchView = (view) => {
-      if (view === 'planos') {
+      if (view === 'planos' || view === 'data_tools') {
         if (hasModule('crud')) {
-          currentView.value = 'planos'
+          currentView.value = view
         }
       } else if (hasModule(view) || (view === 'usuarios_roles' && currentUser.value.is_superadmin)) {
         currentView.value = view
@@ -308,6 +321,7 @@ export default {
         case 'crud': return 'DataCRUD'
         case 'usuarios_roles': return 'UsuariosRoles'
         case 'planos': return 'PlanosPanel'
+        case 'data_tools': return 'DataTools'
         default: return 'Dashboard'
       }
     })
@@ -320,6 +334,7 @@ export default {
         case 'crud': return 'Panel de Gestión de Datos'
         case 'usuarios_roles': return 'Seguridad y Accesos'
         case 'planos': return 'Planos e Infraestructura'
+        case 'data_tools': return 'Herramientas de Datos'
         default: return 'Panel de Inicio'
       }
     })
@@ -332,6 +347,7 @@ export default {
         case 'crud': return 'Carga, edición y eliminación de elementos y dependencias lógicas'
         case 'usuarios_roles': return 'Matriz de permisos, gestión de roles y cuentas de usuario del sistema'
         case 'planos': return 'Mapeo Drag & Drop de activos e infraestructura en planos de planta'
+        case 'data_tools': return 'Importar y exportar planillas de datos XLS/CSV o backups del sistema'
         default: return ''
       }
     })

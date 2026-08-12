@@ -37,6 +37,7 @@ cmdb/
 │   │   ├── crud.py             # Lógica transaccional y hash de contraseñas
 │   │   ├── main.py             # Endpoints del sistema y Middleware de Seguridad
 │   │   ├── simulator.py        # Algoritmo de caída en cascada (Gemelo Digital)
+│   │   ├── data_tools.py       # Importación, exportación y backups en XLS/CSV
 │   │   └── pdf_generator.py    # Generador de Remitos y Actas de Entrega
 │   ├── Dockerfile
 │   └── requirements.txt
@@ -50,6 +51,7 @@ cmdb/
 │   │   │   ├── ITAMPanel.vue        # Registro de inventario y consumo
 │   │   │   ├── DataCRUD.vue         # ABM unificado de activos de red
 │   │   │   ├── UsuariosRoles.vue    # Panel de administración de RBAC
+│   │   │   ├── DataTools.vue        # Panel de importación, exportación y backups
 │   │   │   └── Login.vue            # Tarjeta de autenticación de usuario
 │   │   ├── App.vue             # Componente raíz y control de vistas
 │   │   └── main.js             # Inicialización de la aplicación Vue
@@ -117,7 +119,7 @@ Toda solicitud HTTP entrante al backend (excepto el login y el health check) es 
 5.  **Mapeo de Ruta a Módulo**: Traduce la URL solicitada al módulo correspondiente:
     *   `/api/simulator` $\rightarrow$ Módulo `simulator`
     *   `/api/inventario`, `/api/consumibles` $\rightarrow$ Módulo `itam`
-    *   `/api/subestaciones`, `/api/hosts`, `/api/marcas`, etc. $\rightarrow$ Módulo `crud`
+    *   `/api/subestaciones`, `/api/hosts`, `/api/marcas`, `/api/data` (Importaciones y Exportaciones), etc. $\rightarrow$ Módulo `crud`
 6.  **Verificación de Operación (Lectura/Escritura)**:
     *   Métodos **`GET`** requieren que `can_read == True` en base de datos.
     *   Métodos **`POST`**, **`PUT`**, **`DELETE`** requieren que `can_write == True`.

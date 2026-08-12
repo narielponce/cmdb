@@ -1500,4 +1500,126 @@ def posicionar_plano_items(plano_id: int, request: schemas.PlanoPosicionesReques
     db.commit()
     return {"message": "Posiciones guardadas correctamente"}
 
+# ==========================================
+#    API ENDPOINTS: DATA TOOLS (IMPORT/EXPORT)
+# ==========================================
+from . import data_tools
+from fastapi import UploadFile, File, Form
+from fastapi.responses import Response
+
+@app.get("/api/data/template/{table_name}")
+def get_table_template(table_name: str):
+    if table_name not in data_tools.TABLE_MODELS:
+        raise HTTPException(status_code=404, detail="Tabla no encontrada")
+    csv_data = data_tools.get_sample_template(table_name)
+    return Response(
+        content=csv_data,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={table_name}_template.csv"}
+    )
+
+@app.get("/api/data/export/{table_name}")
+def export_table(table_name: str, format: str = "csv", db: Session = Depends(get_db)):
+    if table_name not in data_tools.TABLE_MODELS:
+        raise HTTPException(status_code=404, detail="Tabla no encontrada")
+    model = data_tools.TABLE_MODELS[table_name]
+    
+    if format.lower() == "xlsx":
+        xlsx_data = data_tools.export_table_to_xlsx(db, model)
+        return Response(
+            content=xlsx_data,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={table_name}_export.xlsx"}
+        )
+    else:
+        csv_data = data_tools.export_table_to_csv(db, model)
+        return Response(
+            content=csv_data,
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename={table_name}_export.csv"}
+        )
+
+@app.get("/api/data/export-backup")
+def export_backup(db: Session = Depends(get_db)):
+    zip_data = data_tools.export_all_tables_to_zip(db)
+    return Response(
+        content=zip_data,
+        media_type="application/zip",
+        headers={"Content-Disposition": "attachment; filename=cmdb_backup_completo.zip"}
+    )
+
+@app.post("/api/data/import")
+async def import_data(
+    table_name: str = Form(...),
+    mode: str = Form("upsert"),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    if table_name not in data_tools.TABLE_MODELS:
+        raise HTTPException(status_code=404, detail="Tabla no encontrada")
+    model = data_tools.TABLE_MODELS[table_name]
+    
+    file_bytes = await file.read()
+    filename = file.filename.lower()
+    
+    # Read rows from file
+    if filename.endswith(".xlsx"):
+        rows = data_tools.read_xlsx_to_dicts(file_bytes)
+    elif filename.endswith(".csv"):
+        rows = data_tools.read_csv_to_dicts(file_bytes)
+    else:
+        raise HTTPException(status_code=400, detail="Formato de archivo no soportado. Suba un archivo CSV o XLSX.")
+        
+    if not rows:
+        return {"message": "El archivo está vacío o no contiene filas de datos", "stats": {"inserted": 0, "updated": 0, "errors": []}}
+        
+    # Validation logic (check headers match table columns)
+    columns = set(model.__table__.columns.keys())
+    file_headers = set(rows[0].keys())
+    
+    # Ensure at least some headers match columns
+    matching_headers = columns.intersection(file_headers)
+    if not matching_headers:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Las cabeceras del archivo no coinciden con ninguna de las columnas de la tabla. Columnas esperadas: {', '.join(columns)}"
+        )
+        
+    # Clean mode: delete all existing records first
+    if mode == "clean":
+        try:
+            db.query(model).delete()
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(
+                status_code=400,
+                detail=f"No se pudo vaciar la tabla debido a restricciones de integridad (claves foráneas activas). Use el modo 'upsert'. Detalle: {str(e)}"
+            )
+            
+    stats = {"inserted": 0, "updated": 0, "errors": []}
+    
+    # Process row by row
+    for index, row in enumerate(rows, start=2): # start from row 2 (header is row 1)
+        try:
+            res = data_tools.upsert_row(db, model, row)
+            if res == "inserted":
+                stats["inserted"] += 1
+            else:
+                stats["updated"] += 1
+        except Exception as e:
+            db.rollback()
+            stats["errors"].append(f"Fila {index}: {str(e)}")
+            
+    db.commit()
+    
+    # Reset serial sequences in case explicit IDs were inserted
+    data_tools.reset_db_sequences(db)
+    
+    return {
+        "message": "Proceso de importación finalizado",
+        "stats": stats
+    }
+
+
 
