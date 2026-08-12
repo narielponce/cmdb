@@ -89,9 +89,10 @@
           <div 
             v-for="item in filteredUnplacedItems" 
             :key="item.type + '-' + item.id"
-            draggable="true"
+            :draggable="isEditMode && canWrite"
             @dragstart="startDrag($event, item)"
-            class="flex items-center gap-2.5 p-2 rounded-lg border border-slate-200 bg-white hover:border-primary/50 hover:shadow-sm cursor-grab transition active:cursor-grabbing text-xs"
+            class="flex items-center gap-2.5 p-2 rounded-lg border border-slate-200 bg-white hover:border-primary/50 hover:shadow-sm transition active:cursor-grabbing text-xs"
+            :class="{ 'cursor-grab': isEditMode && canWrite, 'opacity-70': !isEditMode }"
             :title="item.nombre + ' - Estado: ' + (item.estado || 'Ok')"
           >
             <div 
@@ -119,9 +120,26 @@
             <h4 class="font-bold text-slate-800 text-base">📍 Distribución Física: {{ selectedPlano.nombre }}</h4>
             <p class="text-xs text-slate-400">Haz clic y arrastra los elementos colocados para ajustar sus coordenadas.</p>
           </div>
-          <div class="flex gap-2">
+          <div class="flex items-center gap-4">
+            <!-- Modo Edición Toggle Switch (Only visible if canWrite) -->
+            <div v-if="canWrite" class="flex items-center gap-2">
+              <span class="text-xs font-semibold text-slate-500">
+                {{ isEditMode ? '✍️ Modo Edición' : '📡 Tiempo Real' }}
+              </span>
+              <label class="relative inline-flex items-center cursor-pointer select-none">
+                <input 
+                  type="checkbox" 
+                  v-model="isEditMode" 
+                  class="sr-only peer"
+                  @change="onEditModeChange"
+                />
+                <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-violet-600"></div>
+              </label>
+            </div>
+
+            <!-- Guardar Distribución button -->
             <button 
-              v-if="canWrite"
+              v-if="canWrite && isEditMode"
               @click="guardarDistribucion" 
               :disabled="savingPositions"
               class="btn btn-primary px-4 py-2 text-sm font-semibold rounded-lg shadow-sm flex items-center gap-1.5"
@@ -211,15 +229,16 @@
                 width: '40px',
                 height: '40px'
               }"
-              draggable="true"
+              :draggable="isEditMode && canWrite"
               @dragstart="startDrag($event, item)"
               @dblclick="unplaceItem(item)"
-              :title="item.nombre + ' (' + item.tipo + ') - Estado: ' + (item.estado || 'Ok') + ' - Doble click para remover'"
+              :title="item.nombre + ' (' + item.tipo + ') - Estado: ' + (item.estado || 'Ok') + (isEditMode && canWrite ? ' - Doble click para remover' : '')"
             >
               <!-- Colored Circle pin -->
               <div 
                 :class="[
-                  'w-10 h-10 rounded-full flex items-center justify-center text-lg shadow-lg border-2 transition transform hover:scale-110 active:scale-95 cursor-grab',
+                  'w-10 h-10 rounded-full flex items-center justify-center text-lg shadow-lg border-2 transition transform hover:scale-110 active:scale-95',
+                  isEditMode && canWrite ? 'cursor-grab' : '',
                   item.estado === 'Crítico' 
                     ? 'bg-red-600 text-white border-red-400 ring-4 ring-red-500/50 animate-pulse shadow-lg shadow-red-600/40' 
                     : (getTypeColorClass(item.tipo) + ' border-white ring-4 ring-slate-900/10')
@@ -313,6 +332,7 @@ export default {
     const unplacedItems = ref([])
     const loadingItems = ref(false)
     const savingPositions = ref(false)
+    const isEditMode = ref(false)
     
     // Search
     const searchItemQuery = ref('')
@@ -390,7 +410,7 @@ export default {
     }
 
     const onDrop = (event) => {
-      if (!draggedItem.value) return
+      if (!draggedItem.value || !isEditMode.value) return
       
       const rect = event.currentTarget.getBoundingClientRect()
       const x = Math.round(event.clientX - rect.left)
@@ -423,7 +443,7 @@ export default {
     }
 
     const unplaceItem = (item) => {
-      if (!canWrite.value) return
+      if (!canWrite.value || !isEditMode.value) return
       
       // Remove from placed
       const idx = placedItems.value.findIndex(p => p.id === item.id && p.tipo === item.tipo)
@@ -468,6 +488,7 @@ export default {
 
         await axios.post(`/api/planos/${selectedPlano.value.id}/posicionar`, payload)
         alert("✨ Distribución de equipos guardada con éxito.")
+        isEditMode.value = false // Turn off edit mode upon save
         await fetchPlanoItems(selectedPlano.value.id)
       } catch (err) {
         console.error("Error saving positioning", err)
@@ -693,6 +714,13 @@ export default {
       )
     })
 
+    const onEditModeChange = () => {
+      if (!isEditMode.value && selectedPlano.value) {
+        // Restore items to database positions on disable
+        fetchPlanoItems(selectedPlano.value.id)
+      }
+    }
+
     let pollingInterval = null
 
     onMounted(() => {
@@ -701,7 +729,7 @@ export default {
       
       // Poll every 4 seconds to update device states in real-time
       pollingInterval = setInterval(() => {
-        if (selectedPlano.value && !showModal.value && !savingPositions.value) {
+        if (selectedPlano.value && !showModal.value && !savingPositions.value && !isEditMode.value) {
           fetchPlanoItems(selectedPlano.value.id)
         }
       }, 4000)
@@ -728,6 +756,8 @@ export default {
       modalMode,
       modalPlano,
       uploadingImage,
+      isEditMode,
+      onEditModeChange,
       seleccionarPlano,
       abrirModalCrear,
       abrirModalEditar,
