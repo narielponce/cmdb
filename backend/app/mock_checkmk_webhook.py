@@ -26,8 +26,12 @@ def send_webhook(host_name, host_state, url=DEFAULT_URL):
         method="POST"
     )
     
+    # Ignore SSL verification for self-signed certificates or raw IP testing
+    import ssl
+    context = ssl._create_unverified_context()
+    
     try:
-        with urllib.request.urlopen(req) as response:
+        with urllib.request.urlopen(req, context=context) as response:
             res_body = response.read().decode("utf-8")
             print("\n🟢 Webhook procesado exitosamente!")
             print(json.dumps(json.loads(res_body), indent=2, ensure_ascii=False))
