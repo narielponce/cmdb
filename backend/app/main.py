@@ -1121,8 +1121,7 @@ def get_inventario_consolidado(db: Session = Depends(get_db), current_user: mode
         })
         
     # 3. Hosts (Roles: AP, Cámara, PLC)
-    q_hosts = db.query(models.Host).join(models.TipoHost).filter(
-        models.TipoHost.nombre == "Host",
+    q_hosts = db.query(models.Host).filter(
         models.Host.rol.in_(["AP", "Cámara", "PLC"])
     )
     if domain_filter:
