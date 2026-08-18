@@ -186,7 +186,7 @@ def check_global_permission(request: Request, db: Session = Depends(get_db)):
                 detail="No tiene permisos de lectura para acceder a estos datos de infraestructura"
             )
 
-    if path.startswith("/api/inventario") or path.startswith("/api/consumibles"):
+    if path.startswith("/api/inventario") or path.startswith("/api/consumibles") or path.startswith("/api/v1/itam"):
         module_name = "itam"
     elif path.startswith("/api/simulator"):
         module_name = "simulator"
@@ -226,6 +226,24 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+def check_write_domain(user: models.User, dominio: str):
+    if user.is_superadmin or user.dominio_asignado == "ALL":
+        return
+    if dominio != user.dominio_asignado:
+        raise HTTPException(
+            status_code=403,
+            detail="No tiene permisos para gestionar activos fuera de su ámbito asignado"
+        )
+
+def check_host_write_permission(user: models.User, host: models.Host):
+    if user.is_superadmin or user.dominio_asignado == "ALL":
+        return
+    if host.dominio != user.dominio_asignado:
+        raise HTTPException(
+            status_code=403,
+            detail="No tiene permisos para gestionar activos fuera de su ámbito asignado"
+        )
 
 # Seed Database if empty
 def seed_database(db: Session):
@@ -295,6 +313,7 @@ def seed_database(db: Session):
     ups_list = []
     for i in range(1, 21):
         bb_id = blindobarras_list[(i - 1) % len(blindobarras_list)].id
+        dom_val = "SHOPFLOOR" if i % 3 == 0 else ("FACILITIES" if i % 3 == 1 else "NETWORK")
         ups = models.Host(
             nombre=f"UPS-General-P{i}", 
             blindobarra_id=bb_id, 
@@ -303,7 +322,8 @@ def seed_database(db: Session):
             serial=f"APC992388{i:02d}", 
             capacidad_kva=10.0 + i*5.0, 
             estado_id=ok_estado_id if i % 3 != 0 else cambio_baterias_estado_id,
-            tipo_host_id=ups_tipo_id
+            tipo_host_id=ups_tipo_id,
+            dominio=dom_val
         )
         db.add(ups)
         ups_list.append(ups)
@@ -326,6 +346,7 @@ def seed_database(db: Session):
     switches_list = []
     for i in range(1, 21):
         rack_id = racks_list[(i - 1) % len(racks_list)].id
+        dom_val = "SHOPFLOOR" if i % 3 == 0 else ("FACILITIES" if i % 3 == 1 else "NETWORK")
         sw = models.Host(
             nombre=f"SW-ACCESO-{i:02d}", 
             ip=f"10.20.30.{i}", 
@@ -334,7 +355,8 @@ def seed_database(db: Session):
             modelo="Catalyst 9300", 
             serial=f"FCW2210X{i:03d}", 
             vlan=str(10 + i),
-            tipo_host_id=sw_tipo_id
+            tipo_host_id=sw_tipo_id,
+            dominio=dom_val
         )
         db.add(sw)
         switches_list.append(sw)
@@ -366,6 +388,7 @@ def seed_database(db: Session):
         else:
             th_id = host_tipo_id
             
+        dom_val = "SHOPFLOOR" if rol in ["PLC", "HMI", "PC de Control"] else ("FACILITIES" if rol == "Cámara" else "NETWORK")
         h = models.Host(
             nombre=f"EQUIPO-{rol}-{i:02d}", 
             ip=f"10.20.30.{100 + i}", 
@@ -376,7 +399,8 @@ def seed_database(db: Session):
             modelo="S7-1500" if rol=="PLC" else ("DS-2CD208" if rol=="Cámara" else "ProDesk 400"), 
             serial=f"SRL998233{i:02d}", 
             ubicacion=f"Área Industrial Planta Nave {i}",
-            tipo_host_id=th_id
+            tipo_host_id=th_id,
+            dominio=dom_val
         )
         db.add(h)
         hosts_list.append(h)
@@ -388,6 +412,7 @@ def seed_database(db: Session):
     servidores_list = []
     for i in range(1, 21):
         sw_id = switches_list[(i - 1) % len(switches_list)].id
+        dom_val = "SHOPFLOOR" if i % 3 == 0 else ("FACILITIES" if i % 3 == 1 else "NETWORK")
         srv = models.Host(
             nombre=f"SRV-MES-APP{i:02d}", 
             ip=f"10.100.5.{10 + i}", 
@@ -397,7 +422,8 @@ def seed_database(db: Session):
             modelo="PowerEdge R750", 
             serial=f"DELL9912{i:02d}", 
             switch_id=sw_id,
-            tipo_host_id=srv_tipo_id
+            tipo_host_id=srv_tipo_id,
+            dominio=dom_val
         )
         db.add(srv)
         servidores_list.append(srv)
@@ -460,11 +486,13 @@ def seed_database(db: Session):
     # 12. Stock Consumibles (20 elements)
     for i in range(1, 21):
         cat_id = catalogo_list[(i - 1) % len(catalogo_list)].id
+        dom_val = "SHOPFLOOR" if i % 3 == 0 else ("FACILITIES" if i % 3 == 1 else "NETWORK")
         stock = models.StockConsumible(
             catalogo_id=cat_id, 
             cantidad=10 + i * 5, 
             ubicacion=f"Estantería {i} - Depósito IT", 
-            stock_minimo=5
+            stock_minimo=5,
+            dominio=dom_val
         )
         db.add(stock)
     db.commit()
@@ -519,14 +547,40 @@ def seed_database(db: Session):
             nombre="Operador de Planta",
             password="operadorpassword",
             role_id=operador_role.id,
-            is_superadmin=False
+            is_superadmin=False,
+            dominio_asignado="ALL"
+        ))
+        crud.create_user(db, schemas.UserCreate(
+            username="operador_network",
+            nombre="Operador de Red (IT)",
+            password="operadorpassword",
+            role_id=operador_role.id,
+            is_superadmin=False,
+            dominio_asignado="NETWORK"
+        ))
+        crud.create_user(db, schemas.UserCreate(
+            username="operador_facilities",
+            nombre="Operador de Servicios (Facilities)",
+            password="operadorpassword",
+            role_id=operador_role.id,
+            is_superadmin=False,
+            dominio_asignado="FACILITIES"
+        ))
+        crud.create_user(db, schemas.UserCreate(
+            username="operador_shopfloor",
+            nombre="Operador de Planta (OT/Shopfloor)",
+            password="operadorpassword",
+            role_id=operador_role.id,
+            is_superadmin=False,
+            dominio_asignado="SHOPFLOOR"
         ))
         crud.create_user(db, schemas.UserCreate(
             username="lector",
             nombre="Visualizador Invitado",
             password="lectorpassword",
             role_id=lector_role.id,
-            is_superadmin=False
+            is_superadmin=False,
+            dominio_asignado="ALL"
         ))
     
     print("✅ Seed completed!")
@@ -695,24 +749,33 @@ def delete_blindobarra(id: int, db: Session = Depends(get_db)):
 #    API ENDPOINTS: CRUD FOR UPS
 # ==========================================
 @app.get("/api/ups", response_model=List[schemas.UPSResponse])
-def read_ups(db: Session = Depends(get_db)):
-    return crud.get_ups_all(db)
+def read_ups(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    dom = None if current_user.dominio_asignado == "ALL" else current_user.dominio_asignado
+    return crud.get_ups_all(db, dominio=dom)
 
 @app.post("/api/ups", response_model=schemas.UPSResponse)
-def create_ups(ups: schemas.UPSCreate, db: Session = Depends(get_db)):
+def create_ups(ups: schemas.UPSCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    check_write_domain(current_user, ups.dominio)
     return crud.create_ups(db, ups)
 
 @app.put("/api/ups/{id}", response_model=schemas.UPSResponse)
-def update_ups(id: int, ups: schemas.UPSUpdate, db: Session = Depends(get_db)):
-    db_ups = crud.update_ups(db, id, ups)
+def update_ups(id: int, ups: schemas.UPSUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    db_ups = db.query(models.Host).filter(models.Host.id == id).first()
     if not db_ups:
         raise HTTPException(status_code=404, detail="UPS no encontrada")
-    return db_ups
+    check_host_write_permission(current_user, db_ups)
+    if ups.dominio:
+        check_write_domain(current_user, ups.dominio)
+    res = crud.update_ups(db, id, ups)
+    return res
 
 @app.delete("/api/ups/{id}", response_model=schemas.Message)
-def delete_ups(id: int, db: Session = Depends(get_db)):
-    if not crud.delete_ups(db, id):
+def delete_ups(id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    db_ups = db.query(models.Host).filter(models.Host.id == id).first()
+    if not db_ups:
         raise HTTPException(status_code=404, detail="UPS no encontrada")
+    check_host_write_permission(current_user, db_ups)
+    crud.delete_ups(db, id)
     return {"message": "UPS eliminada con éxito"}
 
 # ==========================================
@@ -743,72 +806,99 @@ def delete_rack(id: int, db: Session = Depends(get_db)):
 #    API ENDPOINTS: CRUD FOR SWITCHES
 # ==========================================
 @app.get("/api/switches", response_model=List[schemas.SwitchResponse])
-def read_switches(db: Session = Depends(get_db)):
-    return crud.get_switches(db)
+def read_switches(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    dom = None if current_user.dominio_asignado == "ALL" else current_user.dominio_asignado
+    return crud.get_switches(db, dominio=dom)
 
 @app.post("/api/switches", response_model=schemas.SwitchResponse)
-def create_switch(sw: schemas.SwitchCreate, db: Session = Depends(get_db)):
+def create_switch(sw: schemas.SwitchCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    check_write_domain(current_user, sw.dominio)
     return crud.create_switch(db, sw)
 
 @app.put("/api/switches/{id}", response_model=schemas.SwitchResponse)
-def update_switch(id: int, sw: schemas.SwitchUpdate, db: Session = Depends(get_db)):
-    db_sw = crud.update_switch(db, id, sw)
+def update_switch(id: int, sw: schemas.SwitchUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    db_sw = db.query(models.Host).filter(models.Host.id == id).first()
     if not db_sw:
         raise HTTPException(status_code=404, detail="Switch no encontrado")
-    return db_sw
+    check_host_write_permission(current_user, db_sw)
+    if sw.dominio:
+        check_write_domain(current_user, sw.dominio)
+    res = crud.update_switch(db, id, sw)
+    return res
 
 @app.delete("/api/switches/{id}", response_model=schemas.Message)
-def delete_switch(id: int, db: Session = Depends(get_db)):
-    if not crud.delete_switch(db, id):
+def delete_switch(id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    db_sw = db.query(models.Host).filter(models.Host.id == id).first()
+    if not db_sw:
         raise HTTPException(status_code=404, detail="Switch no encontrado")
+    check_host_write_permission(current_user, db_sw)
+    crud.delete_switch(db, id)
     return {"message": "Switch eliminado con éxito"}
 
 # ==========================================
 #    API ENDPOINTS: CRUD FOR HOSTS
 # ==========================================
 @app.get("/api/hosts", response_model=List[schemas.HostResponse])
-def read_hosts(db: Session = Depends(get_db)):
-    return crud.get_hosts(db)
+def read_hosts(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    dom = None if current_user.dominio_asignado == "ALL" else current_user.dominio_asignado
+    return crud.get_hosts(db, dominio=dom)
 
 @app.post("/api/hosts", response_model=schemas.HostResponse)
-def create_host(h: schemas.HostCreate, db: Session = Depends(get_db)):
+def create_host(h: schemas.HostCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    check_write_domain(current_user, h.dominio)
     return crud.create_host(db, h)
 
 @app.put("/api/hosts/{id}", response_model=schemas.HostResponse)
-def update_host(id: int, h: schemas.HostUpdate, db: Session = Depends(get_db)):
-    db_h = crud.update_host(db, id, h)
+def update_host(id: int, h: schemas.HostUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    db_h = db.query(models.Host).filter(models.Host.id == id).first()
     if not db_h:
         raise HTTPException(status_code=404, detail="Host no encontrado")
-    return db_h
+    check_host_write_permission(current_user, db_h)
+    if h.dominio:
+        check_write_domain(current_user, h.dominio)
+    res = crud.update_host(db, id, h)
+    return res
 
 @app.delete("/api/hosts/{id}", response_model=schemas.Message)
-def delete_host(id: int, db: Session = Depends(get_db)):
-    if not crud.delete_host(db, id):
+def delete_host(id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    db_h = db.query(models.Host).filter(models.Host.id == id).first()
+    if not db_h:
         raise HTTPException(status_code=404, detail="Host no encontrado")
+    check_host_write_permission(current_user, db_h)
+    crud.delete_host(db, id)
     return {"message": "Host eliminado con éxito"}
 
 # ==========================================
 #    API ENDPOINTS: CRUD FOR SERVIDORES
 # ==========================================
 @app.get("/api/servidores", response_model=List[schemas.ServidorResponse])
-def read_servidores(db: Session = Depends(get_db)):
-    return crud.get_servidores(db)
+def read_servidores(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    dom = None if current_user.dominio_asignado == "ALL" else current_user.dominio_asignado
+    return crud.get_servidores(db, dominio=dom)
 
 @app.post("/api/servidores", response_model=schemas.ServidorResponse)
-def create_servidor(srv: schemas.ServidorCreate, db: Session = Depends(get_db)):
+def create_servidor(srv: schemas.ServidorCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    check_write_domain(current_user, srv.dominio)
     return crud.create_servidor(db, srv)
 
 @app.put("/api/servidores/{id}", response_model=schemas.ServidorResponse)
-def update_servidor(id: int, srv: schemas.ServidorUpdate, db: Session = Depends(get_db)):
-    db_srv = crud.update_servidor(db, id, srv)
+def update_servidor(id: int, srv: schemas.ServidorUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    db_srv = db.query(models.Host).filter(models.Host.id == id).first()
     if not db_srv:
         raise HTTPException(status_code=404, detail="Servidor no encontrado")
-    return db_srv
+    check_host_write_permission(current_user, db_srv)
+    if srv.dominio:
+        check_write_domain(current_user, srv.dominio)
+    res = crud.update_servidor(db, id, srv)
+    return res
 
 @app.delete("/api/servidores/{id}", response_model=schemas.Message)
-def delete_servidor(id: int, db: Session = Depends(get_db)):
-    if not crud.delete_servidor(db, id):
+def delete_servidor(id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    db_srv = db.query(models.Host).filter(models.Host.id == id).first()
+    if not db_srv:
         raise HTTPException(status_code=404, detail="Servidor no encontrado")
+    check_host_write_permission(current_user, db_srv)
+    crud.delete_servidor(db, id)
     return {"message": "Servidor eliminado con éxito"}
 
 # ==========================================
@@ -898,13 +988,14 @@ def create_catalogo(cat: schemas.CatalogoCreate, db: Session = Depends(get_db)):
 #   API ENDPOINTS: CRUD FOR STOCK CONSUMIBLES
 # ==========================================
 @app.get("/api/consumibles", response_model=List[schemas.ConsumibleResponse])
-def read_consumibles(db: Session = Depends(get_db)):
-    return crud.get_consumibles(db)
+def read_consumibles(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    dom = None if current_user.dominio_asignado == "ALL" else current_user.dominio_asignado
+    return crud.get_consumibles(db, dominio=dom)
 
 @app.post("/api/consumibles", response_model=schemas.ConsumibleResponse)
-def create_consumible(data: dict, db: Session = Depends(get_db)):
+def create_consumible(data: dict, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    check_write_domain(current_user, data.get("dominio"))
     res = crud.create_consumible_flat(db, data)
-    # returns flat dictionary structure
     return {
         "id": res.id,
         "catalogo_id": res.catalogo_id,
@@ -913,14 +1004,19 @@ def create_consumible(data: dict, db: Session = Depends(get_db)):
         "tipo": res.catalogo.tipo,
         "cantidad": res.cantidad,
         "ubicacion": res.ubicacion,
-        "stock_minimo": res.stock_minimo
+        "stock_minimo": res.stock_minimo,
+        "dominio": res.dominio
     }
 
 @app.put("/api/consumibles/{id}", response_model=schemas.ConsumibleResponse)
-def update_consumible(id: int, data: dict, db: Session = Depends(get_db)):
-    res = crud.update_consumible_flat(db, id, data)
-    if not res:
+def update_consumible(id: int, data: dict, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    db_c = db.query(models.StockConsumible).filter(models.StockConsumible.id == id).first()
+    if not db_c:
         raise HTTPException(status_code=404, detail="Insumo no encontrado")
+    check_write_domain(current_user, db_c.dominio)
+    if "dominio" in data:
+        check_write_domain(current_user, data.get("dominio"))
+    res = crud.update_consumible_flat(db, id, data)
     return {
         "id": res.id,
         "catalogo_id": res.catalogo_id,
@@ -929,13 +1025,17 @@ def update_consumible(id: int, data: dict, db: Session = Depends(get_db)):
         "tipo": res.catalogo.tipo,
         "cantidad": res.cantidad,
         "ubicacion": res.ubicacion,
-        "stock_minimo": res.stock_minimo
+        "stock_minimo": res.stock_minimo,
+        "dominio": res.dominio
     }
 
 @app.delete("/api/consumibles/{id}", response_model=schemas.Message)
-def delete_consumible(id: int, db: Session = Depends(get_db)):
-    if not crud.delete_consumible(db, id):
+def delete_consumible(id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    db_c = db.query(models.StockConsumible).filter(models.StockConsumible.id == id).first()
+    if not db_c:
         raise HTTPException(status_code=404, detail="Insumo no encontrado")
+    check_write_domain(current_user, db_c.dominio)
+    crud.delete_consumible(db, id)
     return {"message": "Insumo eliminado con éxito"}
 
 # ==========================================
@@ -956,6 +1056,7 @@ def get_inventario_consolidado(db: Session = Depends(get_db)):
     switches = db.query(models.Host).join(models.TipoHost).filter(models.TipoHost.nombre == "Switch").all()
     for sw in switches:
         assets.append({
+            "id": sw.id,
             "tipo_equipo": "🔌 Switch",
             "nombre": sw.nombre,
             "marca": sw.marca.nombre if sw.marca else "",
@@ -969,6 +1070,7 @@ def get_inventario_consolidado(db: Session = Depends(get_db)):
     ups_list = db.query(models.Host).join(models.TipoHost).filter(models.TipoHost.nombre == "UPS").all()
     for ups in ups_list:
         assets.append({
+            "id": ups.id,
             "tipo_equipo": "🔋 UPS",
             "nombre": ups.nombre,
             "marca": ups.marca.nombre if ups.marca else "",
@@ -986,6 +1088,7 @@ def get_inventario_consolidado(db: Session = Depends(get_db)):
     for h in hosts:
         tipo = "📶 Access Point" if h.rol == "AP" else ("📷 Cámara IP" if h.rol == "Cámara" else "⚙️ Host Industrial")
         assets.append({
+            "id": h.id,
             "tipo_equipo": tipo,
             "nombre": h.nombre,
             "marca": h.marca.nombre if h.marca else "",
@@ -1362,8 +1465,12 @@ async def upload_plano_imagen(plano_id: int, file: UploadFile = File(...), db: S
     db.refresh(plano)
     return {"message": "Imagen subida exitosamente", "imagen_url": plano.imagen_url}
 
-def serialize_host_for_plano(h):
+def serialize_host_for_plano(h, user=None):
     tipo = h.tipo_host.nombre if h.tipo_host else "Host"
+    readonly = False
+    if user and not user.is_superadmin and user.dominio_asignado != "ALL":
+        if h.dominio != user.dominio_asignado:
+            readonly = True
     return {
         "id": h.id,
         "nombre": h.nombre,
@@ -1375,10 +1482,16 @@ def serialize_host_for_plano(h):
         "plano_id": h.plano_id,
         "switch_id": h.switch_id,
         "rack_id": h.rack_id,
-        "blindobarra_id": h.blindobarra_id
+        "blindobarra_id": h.blindobarra_id,
+        "dominio": h.dominio,
+        "readonly": readonly
     }
 
-def serialize_rack_for_plano(r):
+def serialize_rack_for_plano(r, user=None):
+    readonly = False
+    if user and not user.is_superadmin and user.dominio_asignado != "ALL":
+        if r.ups and r.ups.dominio != user.dominio_asignado:
+            readonly = True
     return {
         "id": r.id,
         "nombre": r.nombre,
@@ -1386,18 +1499,19 @@ def serialize_rack_for_plano(r):
         "x": r.plano_x,
         "y": r.plano_y,
         "plano_id": r.plano_id,
-        "ups_id": r.ups_id
+        "ups_id": r.ups_id,
+        "readonly": readonly
     }
 
 @app.get("/api/planos/{plano_id}/items")
-def get_plano_items(plano_id: int, db: Session = Depends(get_db)):
+def get_plano_items(plano_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     plano = db.query(models.Plano).filter(models.Plano.id == plano_id).first()
     if not plano:
         raise HTTPException(status_code=404, detail="Plano no encontrado")
         
     # 1. Get all racks placed on this specific plano
     placed_racks = db.query(models.Rack).filter(models.Rack.plano_id == plano_id).all()
-    racks_map = {r.id: serialize_rack_for_plano(r) for r in placed_racks}
+    racks_map = {r.id: serialize_rack_for_plano(r, user=current_user) for r in placed_racks}
     
     all_hosts = db.query(models.Host).all()
     placed_hosts_map = {}
@@ -1405,7 +1519,7 @@ def get_plano_items(plano_id: int, db: Session = Depends(get_db)):
     # First pass: explicitly placed hosts on this plano that do NOT have a parent Rack or Switch
     for h in all_hosts:
         if h.plano_id == plano_id and h.rack_id is None and h.switch_id is None:
-            placed_hosts_map[h.id] = serialize_host_for_plano(h)
+            placed_hosts_map[h.id] = serialize_host_for_plano(h, user=current_user)
             
     # Iteratively resolve placements for this specific plano
     resolved_any = True
@@ -1423,7 +1537,7 @@ def get_plano_items(plano_id: int, db: Session = Depends(get_db)):
                 x = h.plano_x if h.plano_x is not None else (parent_rack["x"] or 100)
                 y = h.plano_y if h.plano_y is not None else ((parent_rack["y"] or 100) + 60)
                 
-                serialized = serialize_host_for_plano(h)
+                serialized = serialize_host_for_plano(h, user=current_user)
                 serialized["x"] = x
                 serialized["y"] = y
                 serialized["plano_id"] = plano_id
@@ -1436,7 +1550,7 @@ def get_plano_items(plano_id: int, db: Session = Depends(get_db)):
                 x = h.plano_x if h.plano_x is not None else ((parent_switch["x"] or 100) + 60)
                 y = h.plano_y if h.plano_y is not None else (parent_switch["y"] or 100)
                 
-                serialized = serialize_host_for_plano(h)
+                serialized = serialize_host_for_plano(h, user=current_user)
                 serialized["x"] = x
                 serialized["y"] = y
                 serialized["plano_id"] = plano_id
@@ -1465,8 +1579,8 @@ def get_plano_items(plano_id: int, db: Session = Depends(get_db)):
                 resolved_any_global = True
 
     # Calculate unplaced lists (not placed on ANY plano, either explicitly or implicitly)
-    unplaced_racks = [serialize_rack_for_plano(r) for r in all_racks if r.id not in placed_rack_ids_any]
-    unplaced_hosts = [serialize_host_for_plano(h) for h in all_hosts if h.id not in placed_host_ids_any]
+    unplaced_racks = [serialize_rack_for_plano(r, user=current_user) for r in all_racks if r.id not in placed_rack_ids_any]
+    unplaced_hosts = [serialize_host_for_plano(h, user=current_user) for h in all_hosts if h.id not in placed_host_ids_any]
             
     return {
         "placed_hosts": list(placed_hosts_map.values()),
@@ -1476,7 +1590,7 @@ def get_plano_items(plano_id: int, db: Session = Depends(get_db)):
     }
 
 @app.post("/api/planos/{plano_id}/posicionar")
-def posicionar_plano_items(plano_id: int, request: schemas.PlanoPosicionesRequest, db: Session = Depends(get_db)):
+def posicionar_plano_items(plano_id: int, request: schemas.PlanoPosicionesRequest, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     plano = db.query(models.Plano).filter(models.Plano.id == plano_id).first()
     if not plano:
         raise HTTPException(status_code=404, detail="Plano no encontrado")
@@ -1485,6 +1599,9 @@ def posicionar_plano_items(plano_id: int, request: schemas.PlanoPosicionesReques
     for r_pos in request.racks:
         db_rack = db.query(models.Rack).filter(models.Rack.id == r_pos.id).first()
         if db_rack:
+            # Check domain write permission for Rack (based on its feeding UPS domain)
+            if db_rack.ups:
+                check_host_write_permission(current_user, db_rack.ups)
             if r_pos.x is None or r_pos.y is None:
                 db_rack.plano_id = None
                 db_rack.plano_x = None
@@ -1498,6 +1615,8 @@ def posicionar_plano_items(plano_id: int, request: schemas.PlanoPosicionesReques
     for h_pos in request.hosts:
         db_host = db.query(models.Host).filter(models.Host.id == h_pos.id).first()
         if db_host:
+            # Check domain write permission for Host
+            check_host_write_permission(current_user, db_host)
             if h_pos.x is None or h_pos.y is None:
                 db_host.plano_id = None
                 db_host.plano_x = None
@@ -1760,11 +1879,14 @@ def checkmk_webhook_receiver(payload: CheckmkWebhookPayload, db: Session = Depen
     }
 
 @app.get("/api/v1/itam/lifecycle/alerts")
-def get_itam_lifecycle_alerts(db: Session = Depends(get_db)):
+def get_itam_lifecycle_alerts(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     from datetime import date
     
     today = date.today()
-    assets = db.query(models.Host).all()
+    query = db.query(models.Host)
+    if not current_user.is_superadmin and current_user.dominio_asignado != "ALL":
+         query = query.filter(models.Host.dominio == current_user.dominio_asignado)
+    assets = query.all()
     
     kpis = {
         "baterias_critico": 0,
@@ -1882,10 +2004,109 @@ def get_itam_lifecycle_alerts(db: Session = Depends(get_db)):
             "proveedor_soporte": asset.proveedor_soporte or "",
             "numero_contrato": asset.numero_contrato or "",
             "estado_salud": estado_salud,
-            "alertas": alertas
+            "alertas": alertas,
+            "dominio": asset.dominio
         })
         
     return {
         "kpis": kpis,
         "inventory": inventory
     }
+
+@app.post("/api/v1/itam/mantenimientos", response_model=schemas.MantenimientoResponse)
+def create_mantenimiento(
+    payload: schemas.MantenimientoCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    from datetime import date
+    host = db.query(models.Host).filter(models.Host.id == payload.host_id).first()
+    if not host:
+        raise HTTPException(status_code=404, detail="Activo no encontrado")
+
+    if not current_user.is_superadmin and current_user.dominio_asignado != "ALL":
+        if host.dominio != current_user.dominio_asignado:
+            raise HTTPException(
+                status_code=403,
+                detail="No tiene permisos para gestionar activos fuera de su ámbito asignado"
+            )
+
+    db_maint = models.Mantenimiento(
+        host_id=payload.host_id,
+        usuario_id=current_user.id,
+        tipo=payload.tipo,
+        descripcion_trabajo=payload.descripcion_trabajo,
+        tecnico_responsable=payload.tecnico_responsable,
+        costo=payload.costo,
+        proxima_fecha_sugerida=payload.proxima_fecha_sugerida
+    )
+    db.add(db_maint)
+
+    # Atomic update on Host
+    today = date.today()
+    if payload.tipo == 'CAMBIO_BATERIA':
+        host.fecha_cambio_baterias = today
+        if payload.proxima_fecha_sugerida:
+            host.proximo_cambio_baterias = payload.proxima_fecha_sugerida
+    else:
+        # PREVENTIVO / CORRECTIVO
+        host.ultimo_mantenimiento = today
+        if payload.proxima_fecha_sugerida:
+            host.proximo_mantenimiento = payload.proxima_fecha_sugerida
+
+    # Restablece el estado_id a 'Ok' si se concluyo la reparacion
+    if payload.restablecer_estado:
+        ok_estado_id = crud.get_or_create_estado(db, "Ok")
+        host.estado_id = ok_estado_id
+
+    db.commit()
+    db.refresh(db_maint)
+    
+    return schemas.MantenimientoResponse(
+        id=db_maint.id,
+        host_id=db_maint.host_id,
+        usuario_id=db_maint.usuario_id,
+        usuario_username=current_user.username,
+        tipo=db_maint.tipo,
+        fecha_ejecucion=db_maint.fecha_ejecucion,
+        descripcion_trabajo=db_maint.descripcion_trabajo,
+        tecnico_responsable=db_maint.tecnico_responsable,
+        costo=db_maint.costo,
+        proxima_fecha_sugerida=db_maint.proxima_fecha_sugerida
+    )
+
+@app.get("/api/v1/itam/hosts/{host_id}/mantenimientos", response_model=List[schemas.MantenimientoResponse])
+def get_host_mantenimientos(
+    host_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    # Verify host exists
+    host = db.query(models.Host).filter(models.Host.id == host_id).first()
+    if not host:
+        raise HTTPException(status_code=404, detail="Activo no encontrado")
+
+    if not current_user.is_superadmin and current_user.dominio_asignado != "ALL":
+        if host.dominio != current_user.dominio_asignado:
+            raise HTTPException(
+                status_code=403,
+                detail="No tiene permisos para gestionar activos fuera de su ámbito asignado"
+            )
+
+    maints = db.query(models.Mantenimiento).filter(models.Mantenimiento.host_id == host_id).order_by(models.Mantenimiento.fecha_ejecucion.desc()).all()
+    
+    res = []
+    for m in maints:
+        res.append(schemas.MantenimientoResponse(
+            id=m.id,
+            host_id=m.host_id,
+            usuario_id=m.usuario_id,
+            usuario_username=m.usuario.username if m.usuario else None,
+            tipo=m.tipo,
+            fecha_ejecucion=m.fecha_ejecucion,
+            descripcion_trabajo=m.descripcion_trabajo,
+            tecnico_responsable=m.tecnico_responsable,
+            costo=m.costo,
+            proxima_fecha_sugerida=m.proxima_fecha_sugerida
+        ))
+    return res

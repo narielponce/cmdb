@@ -210,6 +210,7 @@
               <th>Modelo</th>
               <th>Nro Serie</th>
               <th>ID Checkmk</th>
+              <th>Ámbito</th>
               <th style="width: 120px;">Acciones</th>
             </tr>
             <tr v-else-if="activeTab === 'racks'">
@@ -226,6 +227,7 @@
               <th>IP Gestión</th>
               <th>VLAN</th>
               <th>ID Checkmk</th>
+              <th>Ámbito</th>
               <th style="width: 100px;">Acciones</th>
             </tr>
             <tr v-else-if="activeTab === 'hosts'">
@@ -236,6 +238,7 @@
               <th>Rol</th>
               <th>Ubicación</th>
               <th>ID Checkmk</th>
+              <th>Ámbito</th>
               <th style="width: 120px;">Acciones</th>
             </tr>
             <tr v-else-if="activeTab === 'servidores'">
@@ -248,6 +251,7 @@
               <th>Tipo</th>
               <th>Sistema Operativo</th>
               <th>ID Checkmk</th>
+              <th>Ámbito</th>
               <th style="width: 100px;">Acciones</th>
             </tr>
             <tr v-else-if="activeTab === 'aplicaciones'">
@@ -327,6 +331,13 @@
                 <td><input type="text" class="editable-cell" v-model="item.modelo" /></td>
                 <td><input type="text" class="editable-cell" v-model="item.serial" /></td>
                 <td><input type="text" class="editable-cell" v-model="item.checkmk_host_id" placeholder="Nombre en Checkmk" /></td>
+                <td>
+                  <select class="editable-cell" v-model="item.dominio" :disabled="user_dominio !== 'ALL' || !hasRowPermission(item) || !canWrite">
+                    <option value="NETWORK">NETWORK</option>
+                    <option value="FACILITIES">FACILITIES</option>
+                    <option value="SHOPFLOOR">SHOPFLOOR</option>
+                  </select>
+                </td>
               </template>
 
               <!-- RACKS -->
@@ -358,6 +369,13 @@
                 <td><input type="text" class="editable-cell" v-model="item.ip" /></td>
                 <td><input type="text" class="editable-cell" v-model="item.vlan_gestion" /></td>
                 <td><input type="text" class="editable-cell" v-model="item.checkmk_host_id" placeholder="Nombre en Checkmk" /></td>
+                <td>
+                  <select class="editable-cell" v-model="item.dominio" :disabled="user_dominio !== 'ALL' || !hasRowPermission(item) || !canWrite">
+                    <option value="NETWORK">NETWORK</option>
+                    <option value="FACILITIES">FACILITIES</option>
+                    <option value="SHOPFLOOR">SHOPFLOOR</option>
+                  </select>
+                </td>
               </template>
 
               <!-- HOSTS -->
@@ -381,6 +399,13 @@
                 </td>
                 <td><input type="text" class="editable-cell" v-model="item.ubicacion" /></td>
                 <td><input type="text" class="editable-cell" v-model="item.checkmk_host_id" placeholder="Nombre en Checkmk" /></td>
+                <td>
+                  <select class="editable-cell" v-model="item.dominio" :disabled="user_dominio !== 'ALL' || !hasRowPermission(item) || !canWrite">
+                    <option value="NETWORK">NETWORK</option>
+                    <option value="FACILITIES">FACILITIES</option>
+                    <option value="SHOPFLOOR">SHOPFLOOR</option>
+                  </select>
+                </td>
               </template>
 
               <!-- SERVIDORES -->
@@ -420,6 +445,13 @@
                   </select>
                 </td>
                 <td><input type="text" class="editable-cell" v-model="item.checkmk_host_id" placeholder="Nombre en Checkmk" /></td>
+                <td>
+                  <select class="editable-cell" v-model="item.dominio" :disabled="user_dominio !== 'ALL' || !hasRowPermission(item) || !canWrite">
+                    <option value="NETWORK">NETWORK</option>
+                    <option value="FACILITIES">FACILITIES</option>
+                    <option value="SHOPFLOOR">SHOPFLOOR</option>
+                  </select>
+                </td>
               </template>
 
               <!-- APLICACIONES -->
@@ -487,7 +519,7 @@
                   >
                     🔍
                   </button>
-                  <template v-if="canWrite">
+                  <template v-if="canWrite && hasRowPermission(item)">
                     <button class="crud-btn" title="Guardar" @click="guardarFila(item)">
                       💾
                     </button>
@@ -495,7 +527,7 @@
                       🗑️
                     </button>
                   </template>
-                  <span v-else-if="activeTab !== 'ups' && activeTab !== 'hosts'" style="font-size: 0.9rem; color: var(--text-muted);" title="Solo Lectura">🔒</span>
+                  <span v-else style="font-size: 0.9rem; color: var(--text-muted);" title="Solo Lectura">🔒</span>
                 </div>
               </td>
             </tr>
@@ -784,6 +816,15 @@
                 <input type="text" class="form-input" v-model="modalHost.ubicacion" placeholder="Ej: Línea 2 / Montaje" />
               </div>
             </template>
+            <!-- Ámbito / Dominio de Activos -->
+            <div style="grid-column: span 2;">
+              <label class="form-label">Ámbito / Dominio de Activos</label>
+              <select class="form-select" v-model="modalHost.dominio" :disabled="user_dominio !== 'ALL'" required>
+                <option value="NETWORK">NETWORK (Red / IT)</option>
+                <option value="FACILITIES">FACILITIES (Infraestructura / Energía)</option>
+                <option value="SHOPFLOOR">SHOPFLOOR (Planta / OT)</option>
+              </select>
+            </div>
           </div>
 
           <div style="display: flex; justify-content: flex-end; gap: 1rem; border-top: 1px solid var(--panel-border); padding-top: 1rem;">
@@ -961,11 +1002,11 @@ export default {
       switch (activeTab.value) {
         case 'subestaciones': return 4
         case 'blindobarras': return 4
-        case 'ups': return 6
+        case 'ups': return 9
         case 'racks': return 3
-        case 'switches': return 8
-        case 'hosts': return 7
-        case 'servidores': return 9
+        case 'switches': return 11
+        case 'hosts': return 9
+        case 'servidores': return 12
         case 'aplicaciones': return 4
         case 'dependencias': return 4
         case 'procesos': return 4
@@ -999,12 +1040,23 @@ export default {
       return pages
     })
 
+    const user_dominio = ref('ALL')
+
     const loadUserPermissions = () => {
       const savedUser = localStorage.getItem('net_cmdb_user')
       if (savedUser) {
         const user = JSON.parse(savedUser)
         canWrite.value = user.is_superadmin || user.modules?.some(m => m.module_name === 'crud' && m.can_write)
+        user_dominio.value = user.dominio_asignado || 'ALL'
       }
+    }
+
+    const hasRowPermission = (item) => {
+      if (user_dominio.value === 'ALL') return true
+      if (item && item.dominio) {
+        return item.dominio === user_dominio.value
+      }
+      return true
     }
 
     // Lookup caches for foreign keys
@@ -1353,7 +1405,8 @@ export default {
       puerto_switch: '',
       ubicacion: '',
       tipo_servidor: 'Virtual (VM)',
-      sistema_operativo: ''
+      sistema_operativo: '',
+      dominio: 'NETWORK'
     })
 
     const abrirModalAlta = () => {
@@ -1383,7 +1436,8 @@ export default {
         puerto_switch: '',
         ubicacion: '',
         tipo_servidor: 'Virtual (VM)',
-        sistema_operativo: ''
+        sistema_operativo: '',
+        dominio: user_dominio.value === 'ALL' ? 'NETWORK' : user_dominio.value
       }
       showModal.value = true
     }
@@ -1399,7 +1453,8 @@ export default {
           marca: modalHost.value.marca,
           modelo: modalHost.value.modelo,
           serial: modalHost.value.serial,
-          ip: modalHost.value.ip
+          ip: modalHost.value.ip,
+          dominio: modalHost.value.dominio
         }
 
         let endpoint = '/api/hosts'
@@ -1486,7 +1541,9 @@ export default {
       guardarModalHost,
       agregarFila,
       guardarFila,
-      eliminarFila
+      eliminarFila,
+      user_dominio,
+      hasRowPermission
     }
   }
 }

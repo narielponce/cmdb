@@ -17,6 +17,9 @@
       <button class="tab-btn" :class="{ active: activeTab === 'history' }" @click="activeTab = 'history'">
         📊 Historial de Movimientos
       </button>
+      <button class="tab-btn" :class="{ active: activeTab === 'mantenimientos' }" @click="activeTab = 'mantenimientos'">
+        🔧 Historial de Mantenimientos
+      </button>
     </div>
 
     <!-- TAB 1: Consolidado de Equipos -->
@@ -627,15 +630,25 @@
                     {{ item.estado_salud === 'VENCIDO/CRITICO' ? '🔴 Vencido' : (item.estado_salud === 'PROXIMO_A_VENCER' ? '🟡 Próximo' : '🟢 Vigente') }}
                   </span>
                 </td>
-                <td>
-                  <button 
-                    v-if="canWrite" 
-                    @click="openEditModal(item)" 
-                    class="btn btn-secondary"
-                    style="width: auto; padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: bold;"
-                  >
-                    ✍️ Fechas
-                  </button>
+                <td style="white-space: nowrap;">
+                  <div style="display: flex; gap: 0.25rem;">
+                    <button 
+                      v-if="canWrite && (user_dominio === 'ALL' || item.dominio === user_dominio)" 
+                      @click="openEditModal(item)" 
+                      class="btn btn-secondary"
+                      style="width: auto; padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: bold;"
+                    >
+                      ✍️ Fechas
+                    </button>
+                    <button 
+                      v-if="canWrite && (user_dominio === 'ALL' || item.dominio === user_dominio)" 
+                      @click="openMaintModal(item)" 
+                      class="btn btn-secondary"
+                      style="width: auto; padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: bold; background-color: var(--slate-100); color: var(--slate-700);"
+                    >
+                      🔧 Mant.
+                    </button>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -685,6 +698,81 @@
               <option :value="20">20</option>
               <option :value="50">50</option>
             </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 6: Historial de Mantenimientos & Intervenciones -->
+    <div v-if="activeTab === 'mantenimientos'">
+      <div class="glass-panel" style="padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem;">
+        <h3 style="margin-bottom: 1rem; font-size: 1.1rem; color: var(--text-main); font-weight: bold; display: flex; align-items: center; gap: 0.5rem;">
+          🔧 Historial de Mantenimientos & Intervenciones
+        </h3>
+        
+        <div style="display: flex; gap: 1rem; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap;">
+          <div style="display: flex; flex-direction: column; gap: 0.25rem; min-width: 250px;">
+            <label style="font-size: 0.75rem; font-weight: bold; color: var(--text-muted);">Seleccionar Activo de Red / Host:</label>
+            <select v-model="selectedHostForMaint" class="form-input text-xs" style="width: 100%;">
+              <option :value="null">-- Seleccione un Equipo --</option>
+              <option v-for="item in inventory" :key="item.id" :value="item.id">
+                {{ item.nombre }} ({{ item.tipo_equipo }} - {{ item.ip || 'Sin IP' }})
+              </option>
+            </select>
+          </div>
+          
+          <button 
+            v-if="selectedHostForMaint && canWrite" 
+            @click="openMaintModalForSelected"
+            class="btn btn-primary"
+            style="width: auto; height: 38px; display: flex; align-items: center; justify-content: center; gap: 0.5rem; font-size: 0.75rem; align-self: flex-end;"
+          >
+            🔧 Registrar Mantenimiento
+          </button>
+        </div>
+
+        <div v-if="!selectedHostForMaint" style="text-align: center; padding: 3rem 1rem; color: var(--text-muted);">
+          <span style="font-size: 2.5rem; display: block; margin-bottom: 0.5rem;">💡</span>
+          Seleccione un equipo del listado para ver su bitácora e historial de intervenciones técnicas.
+        </div>
+
+        <div v-else-if="loadingMaintHistory" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+          Cargando historial de mantenimiento...
+        </div>
+
+        <div v-else-if="maintHistory.length === 0" style="text-align: center; padding: 3rem 1rem; color: var(--warning);">
+          <span style="font-size: 2.5rem; display: block; margin-bottom: 0.5rem;">ℹ️</span>
+          No se registran órdenes de trabajo ni mantenimientos para este equipo en el sistema.
+        </div>
+
+        <div v-else style="position: relative; padding-left: 2rem; border-left: 2px solid var(--panel-border); margin-left: 1rem; margin-top: 1.5rem;">
+          <div v-for="m in maintHistory" :key="m.id" style="position: relative; margin-bottom: 2rem;">
+            <!-- Bullet icon -->
+            <div 
+              style="position: absolute; left: calc(-2rem - 9px); top: 2px; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.2);"
+              :style="m.tipo === 'CAMBIO_BATERIA' ? { backgroundColor: '#f97316' } : (m.tipo === 'CORRECTIVO' ? { backgroundColor: 'var(--danger)' } : { backgroundColor: 'var(--brand-accent)' })"
+            ></div>
+            
+            <div class="glass-panel" style="padding: 1rem; border-radius: 8px; border: 1px solid var(--panel-border); background-color: white;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+                <span style="font-weight: bold; font-size: 0.85rem; color: var(--text-main);">
+                  {{ m.tipo === 'CAMBIO_BATERIA' ? '🔋 Cambio de Baterías' : (m.tipo === 'CORRECTIVO' ? '🛠️ Mantenimiento Correctivo' : '📅 Mantenimiento Preventivo') }}
+                </span>
+                <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 500;">
+                  📅 {{ formatearFecha(m.fecha_ejecucion) }} (Por: {{ m.usuario_username || 'Sistema' }})
+                </span>
+              </div>
+              
+              <div style="font-size: 0.75rem; color: var(--text-main); line-height: 1.4; margin-bottom: 0.5rem; white-space: pre-wrap;">
+                {{ m.descripcion_trabajo }}
+              </div>
+              
+              <div style="display: flex; gap: 1.5rem; flex-wrap: wrap; font-size: 0.7rem; color: var(--text-muted); border-top: 1px solid rgba(0, 0, 0, 0.05); padding-top: 0.5rem;">
+                <div>👤 <strong>Técnico:</strong> {{ m.tecnico_responsable }}</div>
+                <div v-if="m.costo !== null">💰 <strong>Costo:</strong> ${{ m.costo }}</div>
+                <div v-if="m.proxima_fecha_sugerida">⏰ <strong>Próximo Sugerido:</strong> {{ formatearFecha(m.proxima_fecha_sugerida) }}</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -757,6 +845,61 @@
         </form>
       </div>
     </div>
+    <!-- Registrar Mantenimiento Modal (Only visible if canWrite and showMaintModal) -->
+    <div v-if="showMaintModal" style="display: flex; align-items: center; justify-content: center; position: fixed; top: 0; left: 0; width: 100%; height: 100%; backgroundColor: rgba(15, 23, 42, 0.6); z-index: 9999;">
+      <div class="glass-panel" style="width: 100%; max-width: 500px; padding: 1.5rem; max-height: 90vh; overflow-y: auto; border: 1px solid var(--panel-border);">
+        <h3 style="font-weight: bold; color: var(--text-main); font-size: 1.1rem; border-bottom: 1px solid var(--panel-border); padding-bottom: 0.5rem; margin-bottom: 1rem;">
+          🔧 Registrar Intervención: {{ maintHost?.nombre }}
+        </h3>
+        
+        <form @submit.prevent="submitMaint">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem;">
+            <div style="grid-column: span 2;" class="form-group">
+              <label class="form-label text-xs">Tipo de Mantenimiento</label>
+              <select v-model="maintForm.tipo" class="form-input text-xs" style="width: 100%;" required>
+                <option value="PREVENTIVO">📅 Preventivo</option>
+                <option value="CORRECTIVO">🛠️ Correctivo</option>
+                <option value="CAMBIO_BATERIA" v-if="maintHost?.tipo === 'UPS' || maintHost?.tipo_equipo === 'UPS'">🔋 Cambio de Baterías</option>
+              </select>
+            </div>
+
+            <div style="grid-column: span 2;" class="form-group">
+              <label class="form-label text-xs">Técnico Responsable</label>
+              <input type="text" v-model="maintForm.tecnico_responsable" placeholder="Ej: Ing. Juan Pérez, Dpto. Soporte" class="form-input text-xs" style="width: 100%;" required />
+            </div>
+
+            <div style="grid-column: span 2;" class="form-group">
+              <label class="form-label text-xs">Descripción del Trabajo Realizado</label>
+              <textarea v-model="maintForm.descripcion_trabajo" placeholder="Describa el trabajo detalladamente..." class="form-input text-xs" style="width: 100%; height: 80px; resize: none;" required></textarea>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label text-xs">Costo ($ USD, Opcional)</label>
+              <input type="number" step="0.01" v-model="maintForm.costo" placeholder="Ej: 150.00" class="form-input text-xs" style="width: 100%;" />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label text-xs">Próxima Fecha Sugerida (Opcional)</label>
+              <input type="date" v-model="maintForm.proxima_fecha_sugerida" class="form-input text-xs" style="width: 100%;" />
+            </div>
+
+            <div style="grid-column: span 2; display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
+              <input type="checkbox" id="restablecer_estado" v-model="maintForm.restablecer_estado" style="cursor: pointer;" />
+              <label for="restablecer_estado" style="font-size: 0.75rem; color: var(--text-main); font-weight: 500; cursor: pointer;">
+                Restablecer estado del activo a "Ok" al concluir
+              </label>
+            </div>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 0.75rem; border-top: 1px solid var(--panel-border); padding-top: 1rem;">
+            <button type="button" class="btn btn-secondary" style="max-width: 100px; font-size: 0.75rem;" @click="showMaintModal = false">Cancelar</button>
+            <button type="submit" class="btn btn-primary" style="max-width: 120px; font-size: 0.75rem;" :disabled="submittingMaint">
+              {{ submittingMaint ? '💾 Guardando...' : '💾 Guardar' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -795,11 +938,30 @@ export default {
       numero_contrato: ''
     })
 
+    // Maintenance states
+    const selectedHostForMaint = ref(null)
+    const maintHistory = ref([])
+    const loadingMaintHistory = ref(false)
+    const showMaintModal = ref(false)
+    const maintHost = ref(null)
+    const submittingMaint = ref(false)
+    const maintForm = ref({
+      tipo: 'PREVENTIVO',
+      tecnico_responsable: '',
+      descripcion_trabajo: '',
+      costo: null,
+      proxima_fecha_sugerida: '',
+      restablecer_estado: true
+    })
+
+    const user_dominio = ref('ALL')
+
     const loadUserPermissions = () => {
       const savedUser = localStorage.getItem('net_cmdb_user')
       if (savedUser) {
         const user = JSON.parse(savedUser)
         canWrite.value = user.is_superadmin || user.modules?.some(m => m.module_name === 'itam' && m.can_write)
+        user_dominio.value = user.dominio_asignado || 'ALL'
       }
     }
     
@@ -1161,6 +1323,77 @@ export default {
       }
     }
 
+    const fetchMaintHistory = async (hostId) => {
+      if (!hostId) {
+        maintHistory.value = []
+        return
+      }
+      loadingMaintHistory.value = true
+      try {
+        const response = await axios.get(`/api/v1/itam/hosts/${hostId}/mantenimientos`)
+        maintHistory.value = response.data
+      } catch (error) {
+        console.error("Error fetching maintenance history", error)
+      } finally {
+        loadingMaintHistory.value = false
+      }
+    }
+
+    const openMaintModal = (item) => {
+      maintHost.value = item
+      maintForm.value = {
+        tipo: 'PREVENTIVO',
+        tecnico_responsable: '',
+        descripcion_trabajo: '',
+        costo: null,
+        proxima_fecha_sugerida: '',
+        restablecer_estado: true
+      }
+      showMaintModal.value = true
+    }
+
+    const openMaintModalForSelected = () => {
+      const hostObj = inventory.value.find(h => h.id === selectedHostForMaint.value)
+      if (hostObj) {
+        const mappedObj = {
+          id: hostObj.id,
+          nombre: hostObj.nombre,
+          tipo: hostObj.tipo_equipo
+        }
+        openMaintModal(mappedObj)
+      }
+    }
+
+    const submitMaint = async () => {
+      if (!maintHost.value) return
+      submittingMaint.value = true
+      
+      const payload = {
+        host_id: maintHost.value.id,
+        tipo: maintForm.value.tipo,
+        descripcion_trabajo: maintForm.value.descripcion_trabajo,
+        tecnico_responsable: maintForm.value.tecnico_responsable,
+        costo: maintForm.value.costo ? parseFloat(maintForm.value.costo) : null,
+        proxima_fecha_sugerida: maintForm.value.proxima_fecha_sugerida || null,
+        restablecer_estado: maintForm.value.restablecer_estado
+      }
+      
+      try {
+        await axios.post('/api/v1/itam/mantenimientos', payload)
+        alert("✨ Mantenimiento registrado y estado de activo actualizado con éxito.")
+        showMaintModal.value = false
+        selectedHostForMaint.value = maintHost.value.id
+        await fetchMaintHistory(maintHost.value.id)
+        await fetchLifecycle()
+        await fetchInventory()
+      } catch (error) {
+        console.error("Error creating maintenance record", error)
+        alert("Ocurrió un error al registrar el mantenimiento.")
+      } finally {
+        submittingMaint.value = false
+      }
+    }
+
     const fetchDestinations = async () => {
       try {
         const racksRes = await axios.get('/api/racks')
@@ -1379,7 +1612,15 @@ export default {
         fetchHistorial()
       } else if (newTab === 'lifecycle') {
         fetchLifecycle()
+      } else if (newTab === 'mantenimientos') {
+        if (selectedHostForMaint.value) {
+          fetchMaintHistory(selectedHostForMaint.value)
+        }
       }
+    })
+
+    watch(selectedHostForMaint, (newHostId) => {
+      fetchMaintHistory(newHostId)
     })
 
     onMounted(() => {
@@ -1443,6 +1684,7 @@ export default {
       submittingEdit,
       editForm,
       filteredLifecycle,
+      user_dominio,
       
       onFileChange,
       onDesplegarEquipoChange,
@@ -1458,7 +1700,20 @@ export default {
       fetchLifecycle,
       exportLifecycleCSV,
       openEditModal,
-      submitEditLifecycle
+      submitEditLifecycle,
+      
+      // Maintenance exports
+      selectedHostForMaint,
+      maintHistory,
+      loadingMaintHistory,
+      showMaintModal,
+      maintHost,
+      submittingMaint,
+      maintForm,
+      fetchMaintHistory,
+      openMaintModal,
+      openMaintModalForSelected,
+      submitMaint
     }
   }
 }

@@ -87,13 +87,13 @@
             Ningún equipo disponible para ubicar.
           </div>
           <div 
-            v-for="item in filteredUnplacedItems" 
-            :key="item.type + '-' + item.id"
-            :draggable="isEditMode && canWrite"
-            @dragstart="startDrag($event, item)"
-            class="flex items-center gap-2.5 p-2 rounded-lg border border-slate-200 bg-white hover:border-primary/50 hover:shadow-sm transition active:cursor-grabbing text-xs"
-            :class="{ 'cursor-grab': isEditMode && canWrite, 'opacity-70': !isEditMode }"
-            :title="item.nombre + ' - Estado: ' + (item.estado || 'Ok')"
+             v-for="item in filteredUnplacedItems" 
+             :key="item.type + '-' + item.id"
+             :draggable="isEditMode && canWrite && !item.readonly"
+             @dragstart="startDrag($event, item)"
+             class="flex items-center gap-2.5 p-2 rounded-lg border border-slate-200 bg-white hover:border-primary/50 hover:shadow-sm transition active:cursor-grabbing text-xs"
+             :class="{ 'cursor-grab': isEditMode && canWrite && !item.readonly, 'opacity-70': !isEditMode || item.readonly }"
+             :title="item.nombre + ' - Estado: ' + (item.estado || 'Ok') + (item.readonly ? ' (Solo lectura - Fuera de ámbito)' : '')"
           >
             <div 
               :class="[
@@ -229,22 +229,22 @@
                 width: '40px',
                 height: '40px'
               }"
-              :draggable="isEditMode && canWrite"
+              :draggable="isEditMode && canWrite && !item.readonly"
               @dragstart="startDrag($event, item)"
               @dblclick="unplaceItem(item)"
-              :title="item.nombre + ' (' + item.tipo + ') - Estado: ' + (item.estado || 'Ok') + (isEditMode && canWrite ? ' - Doble click para remover' : '')"
+              :title="item.nombre + ' (' + item.tipo + ') - Estado: ' + (item.estado || 'Ok') + (item.readonly ? ' (Solo Lectura - Fuera de Ámbito)' : '') + (isEditMode && canWrite && !item.readonly ? ' - Doble click para remover' : '')"
             >
               <!-- Colored Circle pin -->
               <div 
                 :class="[
                   'w-10 h-10 rounded-full flex items-center justify-center text-lg shadow-lg border-2 transition transform hover:scale-110 active:scale-95',
-                  isEditMode && canWrite ? 'cursor-grab' : '',
+                  isEditMode && canWrite && !item.readonly ? 'cursor-grab' : '',
                   item.estado === 'Crítico' 
                     ? 'bg-red-600 text-white border-red-400 ring-4 ring-red-500/50 animate-pulse shadow-lg shadow-red-600/40' 
                     : (getTypeColorClass(item.tipo) + ' border-white ring-4 ring-slate-900/10')
                 ]"
               >
-                {{ item.estado === 'Crítico' ? '⚠️' : getTypeIcon(item.tipo) }}
+                {{ item.readonly ? '🔒' : (item.estado === 'Crítico' ? '⚠️' : getTypeIcon(item.tipo)) }}
               </div>
               
               <!-- Floating label -->
@@ -443,7 +443,7 @@ export default {
     }
 
     const unplaceItem = (item) => {
-      if (!canWrite.value || !isEditMode.value) return
+      if (!canWrite.value || !isEditMode.value || item.readonly) return
       
       // Remove from placed
       const idx = placedItems.value.findIndex(p => p.id === item.id && p.tipo === item.tipo)

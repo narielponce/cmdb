@@ -105,6 +105,7 @@ class Host(Base):
     sistema_operativo = Column(String, nullable=True) # for Servidor
     ubicacion = Column(String, default="") # for Host/UPS
     rol = Column(String, default="Otro") # for Host
+    dominio = Column(String, default="NETWORK", nullable=False)
     
     # Relationships
     tipo_host = relationship("TipoHost")
@@ -189,6 +190,7 @@ class StockConsumible(Base):
     cantidad = Column(Integer, default=0)
     ubicacion = Column(String, default="Depósito Principal")
     stock_minimo = Column(Integer, default=5)
+    dominio = Column(String, default="NETWORK", nullable=False)
     
     catalogo = relationship("CatalogoEquipo", back_populates="consumibles")
 
@@ -212,6 +214,7 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     role_id = Column(Integer, ForeignKey("roles.id", ondelete="SET NULL"), nullable=True)
     is_superadmin = Column(Boolean, default=False)
+    dominio_asignado = Column(String, default="ALL", nullable=False)
     
     role = relationship("Role", back_populates="users")
 
@@ -235,3 +238,19 @@ class RoleModule(Base):
     can_write = Column(Boolean, default=False)
     
     role = relationship("Role", back_populates="modules")
+
+class Mantenimiento(Base):
+    __tablename__ = "mantenimientos"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    host_id = Column(Integer, ForeignKey("hosts.id", ondelete="CASCADE"), nullable=False)
+    usuario_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    tipo = Column(String, nullable=False) # 'PREVENTIVO', 'CORRECTIVO', 'CAMBIO_BATERIA'
+    fecha_ejecucion = Column(DateTime, default=func.now())
+    descripcion_trabajo = Column(String, nullable=False)
+    tecnico_responsable = Column(String, nullable=False)
+    costo = Column(Float, nullable=True)
+    proxima_fecha_sugerida = Column(Date, nullable=True)
+    
+    host = relationship("Host")
+    usuario = relationship("User")

@@ -126,6 +126,25 @@ Toda solicitud HTTP entrante al backend (excepto el login y el health check) es 
 
 Si alguna validación falla, retorna inmediatamente **HTTP 401 (Unauthorized)** o **HTTP 403 (Forbidden)**.
 
+### Control de Acceso Granular por Ámbito/Dominio de Activos
+
+Para asegurar la correcta segregación de funciones entre los equipos de Redes (IT/Network), Mantenimiento de Edificios/Energía (Facilities), y Planta Industrial (OT/Shopfloor), se ha integrado un control de seguridad por ámbito a nivel de registro:
+
+1.  **Ámbitos Soportados**:
+    *   `NETWORK`: Redes de datos e IT corporativo.
+    *   `FACILITIES`: Sistemas de energía, UPS, subestaciones y cámaras.
+    *   `SHOPFLOOR`: Dispositivos de automatización industrial, PLC, HMI y PC de control.
+2.  **Propiedades de Usuario y Activo**:
+    *   Cada equipo (`Host`, `UPS`, `Switch`, `Servidor`) e insumo (`StockConsumible`) posee la columna `dominio`.
+    *   Cada `User` posee la propiedad `dominio_asignado` (`ALL` para superadministradores y roles globales, o uno de los ámbitos específicos).
+3.  **Restricciones de Lectura**:
+    *   Los endpoints CRUD `/api/hosts`, `/api/switches`, `/api/ups`, `/api/servidores` y `/api/consumibles` inyectan automáticamente filtros en base de datos (`query.filter(models.Host.dominio == user.dominio_asignado)`) para que un operador de un dominio solo pueda leer elementos asignados a su mismo dominio.
+    *   El listado consolidado `/api/inventario/consolidado` y las alertas de ciclo de vida `/api/v1/itam/lifecycle/alerts` también aplican este filtrado dinámicamente.
+4.  **Restricciones de Escritura y Edición**:
+    *   Al enviar peticiones `POST` (creación), `PUT` (actualización), `DELETE` (eliminación), o registro de mantenimiento preventivo/correctivo, el backend comprueba que el dominio del objeto coincida con el dominio del operador. De lo contrario, la mutación se bloquea devolviendo **HTTP 403 Forbidden**.
+5.  **Visualización en Gemelo Digital (Simulador)**:
+    *   Los operadores de dominio restringido (ej: `SHOPFLOOR`) pueden cargar y visualizar la topología completa en planos (incluyendo switches o UPS "aguas arriba" en otros dominios necesarios para entender la conectividad lógica), pero estos elementos extranjeros se marcan con la bandera `readonly: true` en la API y aparecen en el mapa con un candado de seguridad 🔒. No se pueden arrastrar, posicionar, reubicar ni eliminar del plano.
+
 ---
 
 ## 5. Frontend y Diseño Responsivo (Tailwind CSS v3)
@@ -182,29 +201,99 @@ En entorno local de desarrollo, el esquema público de la base de datos PostgreS
 
 ## 8. Integración con Checkmk (Monitoreo e Impacto)
 
-NetTrack expone un endpoint receptor de webhooks diseñado para integrarse directamente con las notificaciones de alertas de **Checkmk**.
+NetTrack expone un endpoint receptor de webhooks diseñado para integrarse directamente con las notificaciones de alertas de **Checkmk**, vinculándolas con el Gemelo Digital en el plano de planta.
 
-### Mapeo de Identificadores
-Para vincular los hosts de la planta física monitorizados en Checkmk con el Gemelo Digital en NetTrack, se añade el campo `checkmk_host_id` a la tabla `hosts`. Al procesar un webhook:
-1. Se busca una coincidencia exacta de `host_name` de Checkmk contra la columna `checkmk_host_id`.
-2. Si no existe, se realiza un fallback buscando por la columna `nombre` (hostname).
+### Mapeo de Identificadores y Persistencia
+Para vincular los hosts físicos con la CMDB de NetTrack, se utiliza la columna `checkmk_host_id` en la tabla `hosts` (configurable desde la UI en la grilla de administración de datos):
+1. Al recibir un webhook, busca coincidencia de `host_name` contra `checkmk_host_id` y realiza fallback a `nombre` si no existe.
+2. **Actualización de Estado**: Si la alerta es `DOWN` o `CRITICAL`, el backend actualiza su `estado_id` en la base de datos a `3` ("Crítico"). Si la alerta es `UP`, se restablece a `1` ("Ok").
+
+### Propagación de Fallas Recursiva (Cascada en BD)
+Cuando se recibe una alerta de caída (`DOWN` o `CRITICAL`):
+- El webhook calcula recursivamente todos los switches, servidores y hosts lógicos dependientes aguas abajo mediante el algoritmo BFS de [simulator.py](file:///home/ariel/Desarrollos/apps/cmdb/backend/app/simulator.py).
+- **Propagación en Base de Datos**: Marca automáticamente todos los equipos de la cascada afectada como `3` ("Crítico") en PostgreSQL. Al recuperarse el dispositivo origen (`UP`), el webhook restaura todo el árbol afectado a `1` ("Ok").
 
 ### Endpoint del Webhook
 *   **Ruta**: `POST /api/v1/integrations/checkmk/webhook`
-*   **Seguridad**: Bypass total de autenticación JWT (ruta exenta en middleware global) para facilitar el envío directo desde Checkmk.
+*   **Seguridad**: Bypass del middleware JWT (exenta de autorización).
 *   **Payload Aceptado**:
     ```json
     {
-      "host_name": "switch_central_1",
+      "host_name": "SW-CORE",
       "host_state": "DOWN",
       "service_state": null
     }
     ```
 
-### Propagación de Fallas
-Cuando se recibe un estado `DOWN` o `CRITICAL`:
-- **UPS**: Ejecuta la simulación en cascada afectando racks, switches, hosts de red y servidores alimentados.
-- **Switch**: Afecta todos los hosts de red y servidores conectados directamente a sus puertos, calculando además las aplicaciones de software caídas y procesos de planta detenidos.
-- **Servidor**: Ejecuta la simulación de mantenimiento del servidor, calculando el impacto en sistemas de software (SCADA/MES) y líneas de producción.
-- **Hosts**: Se registran como inoperativos sin impacto secundario.
+### Visualización en el Plano (Modo Tiempo Real vs. Modo Edición)
+En la pestaña de planos, el sistema consulta dinámicamente los cambios de estado cada **4 segundos** (polling selectivo):
+- **`📡 Tiempo Real` (Default)**: Muestra en segundos si un equipo cae pintándolo de color rojo pulsante con el ícono `⚠️` de advertencia. En este modo el arrastre está deshabilitado para evitar reinicios de posición durante el refresco.
+- **`✍️ Modo Edición`**: Suspende el refresco automático y habilita las capacidades drag & drop. Al hacer clic en "Guardar Distribución", se guardan las coordenadas en base de datos y se regresa al modo de monitoreo.
+
+---
+
+## 9. Gestión de Ciclo de Vida y Garantías (ITAM)
+
+NetTrack incorpora un panel de **Ciclo de Vida & Alertas Preventivas** para el control del envejecimiento tecnológico del hardware y los vencimientos de contratos de soporte o garantías.
+
+### Columnas de Base de Datos
+La tabla unificada `hosts` cuenta con campos específicos de ciclo de vida (editables vía API o por medio del modal de edición del panel):
+*   `fecha_instalacion` (Date)
+*   `ultimo_mantenimiento` (Date)
+*   `proximo_mantenimiento` (Date)
+*   `proximo_cambio_baterias` (Date) - Específico para UPS
+*   `fecha_eol` (Date) - Fin de Vida / EOS
+*   `fin_garantia_contrato` (Date) - Expiración de contrato de soporte
+*   `proveedor_soporte` (String)
+*   `numero_contrato` (String)
+
+### Endpoint de Alertas de Ciclo de Vida
+*   **Ruta**: `GET /api/v1/itam/lifecycle/alerts`
+*   **Propósito**: Recopila todos los activos de hardware y calcula su **Estado de Salud de Ciclo de Vida** dinámicamente comparando la fecha de hoy con los vencimientos configurados:
+    - **`VENCIDO/CRITICO` (Rojo)**: Si la fecha de mantenimiento, baterías, garantía o EOL ya se encuentra en el pasado.
+    - **`PROXIMO_A_VENCER` (Amarillo)**: Si falta menos de 60 días para el mantenimiento/baterías, o menos de 90 días para EOL o vencimiento de garantía.
+    - **`VIGENTE` (Verde)**: Si todas las fechas están al día.
+
+### Interfaz Gráfica (ITAM)
+El módulo se expone en la pestaña **Ciclo de Vida & Alertas**:
+1.  **Tarjetas KPI**: Resumen cuantitativo de alertas de baterías, mantenimientos, EOL y garantías/contratos vencidos o a vencer.
+2.  **Tabla de Semáforos**: Listado filtrable por color de salud (Rojo, Amarillo, Verde) con búsqueda reactiva.
+3.  **Exportación a CSV**: Permite descargar la tabla de alertas filtradas como archivo CSV plano inmediatamente.
+4.  **Edición Rápida**: Modal interactivo integrado que sanitiza las fechas vacías a `null` para cumplir con las validaciones de tipos de Pydantic.
+
+---
+
+## 10. Módulo de Registro de Mantenimientos (Órdenes de Trabajo)
+
+Se incluye un módulo transaccional para auditar todas las intervenciones técnicas realizadas sobre los activos de hardware.
+
+### Modelo de Datos `Mantenimiento`
+Asociado a la tabla `mantenimientos`, almacena el historial de ejecuciones técnicas:
+*   `id` (Integer, PK)
+*   `host_id` (Integer, FK a `hosts.id`, cascada al borrar)
+*   `usuario_id` (Integer, FK a `users.id`, NULL al borrar usuario)
+*   `tipo` (String: `'PREVENTIVO'`, `'CORRECTIVO'`, `'CAMBIO_BATERIA'`)
+*   `fecha_ejecucion` (DateTime, default ahora)
+*   `descripcion_trabajo` (Text)
+*   `tecnico_responsable` (String)
+*   `costo` (Float, opcional)
+*   `proxima_fecha_sugerida` (Date, opcional)
+
+### Lógica Transaccional (Actualización Atómica)
+Al insertar un nuevo registro mediante `POST /api/v1/itam/mantenimientos`:
+1.  **Actualización de Fechas**:
+    *   Si es `CAMBIO_BATERIA`, se actualiza `fecha_cambio_baterias` al día de hoy y `proximo_cambio_baterias` a `proxima_fecha_sugerida`.
+    *   Si es `PREVENTIVO` o `CORRECTIVO`, se actualiza `ultimo_mantenimiento` al día de hoy y `proximo_mantenimiento` a `proxima_fecha_sugerida`.
+2.  **Recuperación de Estado**: Si se marca la casilla `restablecer_estado`, se actualiza de manera automática el `estado_id` del activo en la tabla `hosts` a `"Ok"` (eliminando la alerta crítica/falla).
+3.  Toda la operación se confirma en una única transacción de base de datos (`db.commit()`).
+
+### Endpoints de API
+*   **`POST /api/v1/itam/mantenimientos`**: Registra la orden de trabajo y actualiza el host. Requiere rol con permisos de escritura en el módulo `itam`.
+*   **`GET /api/v1/itam/hosts/{host_id}/mantenimientos`**: Devuelve el historial ordenado de forma descendente por fecha.
+
+### Componentes en el Frontend
+*   **Botón "Mant."**: Ubicado en cada celda del listado de Ciclo de Vida para registrar intervenciones rápidas.
+*   **Pestaña "Historial de Mantenimientos"**: Muestra una línea de tiempo (Timeline) de los trabajos realizados por equipo, con códigos de color de semáforo dependiendo del tipo de mantenimiento (Naranja: Baterías, Rojo: Correctivo, Verde: Preventivo).
+*   **Modal de Carga**: Formulario emergente para cargar los datos del técnico, costos, y reprogramar la próxima fecha sugerida de mantenimiento.
+
 

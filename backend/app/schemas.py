@@ -75,6 +75,7 @@ class UPSBase(BaseModel):
     vlan: Optional[str] = ""
     capacidad_kva: Optional[float] = 10.0
     estado_baterias: Optional[str] = "Ok"
+    dominio: Optional[str] = "NETWORK"
 
 class UPSCreate(UPSBase):
     pass
@@ -100,6 +101,7 @@ class UPSUpdate(BaseModel):
     vlan: Optional[str] = None
     capacidad_kva: Optional[float] = None
     estado_baterias: Optional[str] = None
+    dominio: Optional[str] = None
 
 class UPSResponse(BaseModel):
     id: int
@@ -124,6 +126,7 @@ class UPSResponse(BaseModel):
     vlan: Optional[str] = ""
     capacidad_kva: Optional[float] = 0.0
     estado_baterias: Optional[str] = "Ok"
+    dominio: Optional[str] = "NETWORK"
     class Config:
         from_attributes = True
 
@@ -168,6 +171,7 @@ class SwitchBase(BaseModel):
     fin_garantia_contrato: Optional[date] = None
     proveedor_soporte: Optional[str] = ""
     numero_contrato: Optional[str] = ""
+    dominio: Optional[str] = "NETWORK"
 
 class SwitchCreate(SwitchBase):
     pass
@@ -188,6 +192,7 @@ class SwitchUpdate(BaseModel):
     fin_garantia_contrato: Optional[date] = None
     proveedor_soporte: Optional[str] = None
     numero_contrato: Optional[str] = None
+    dominio: Optional[str] = None
 
 class SwitchResponse(BaseModel):
     id: int
@@ -207,6 +212,7 @@ class SwitchResponse(BaseModel):
     fin_garantia_contrato: Optional[date] = None
     proveedor_soporte: Optional[str] = ""
     numero_contrato: Optional[str] = ""
+    dominio: Optional[str] = "NETWORK"
     class Config:
         from_attributes = True
 
@@ -225,6 +231,7 @@ class HostBase(BaseModel):
     rol: Optional[str] = "Otro"
     puerto_switch: Optional[str] = ""
     sector_planta: Optional[str] = ""
+    dominio: Optional[str] = "NETWORK"
     fecha_instalacion: Optional[date] = None
     ultimo_mantenimiento: Optional[date] = None
     proximo_mantenimiento: Optional[date] = None
@@ -255,6 +262,7 @@ class HostUpdate(BaseModel):
     fin_garantia_contrato: Optional[date] = None
     proveedor_soporte: Optional[str] = None
     numero_contrato: Optional[str] = None
+    dominio: Optional[str] = None
 
 class HostResponse(BaseModel):
     id: int
@@ -277,6 +285,7 @@ class HostResponse(BaseModel):
     fin_garantia_contrato: Optional[date] = None
     proveedor_soporte: Optional[str] = ""
     numero_contrato: Optional[str] = ""
+    dominio: Optional[str] = "NETWORK"
     class Config:
         from_attributes = True
 
@@ -300,6 +309,7 @@ class ServidorBase(BaseModel):
     fin_garantia_contrato: Optional[date] = None
     proveedor_soporte: Optional[str] = ""
     numero_contrato: Optional[str] = ""
+    dominio: Optional[str] = "NETWORK"
 
 class ServidorCreate(ServidorBase):
     pass
@@ -321,6 +331,7 @@ class ServidorUpdate(BaseModel):
     fin_garantia_contrato: Optional[date] = None
     proveedor_soporte: Optional[str] = None
     numero_contrato: Optional[str] = None
+    dominio: Optional[str] = None
 
 class ServidorResponse(BaseModel):
     id: int
@@ -341,6 +352,7 @@ class ServidorResponse(BaseModel):
     fin_garantia_contrato: Optional[date] = None
     proveedor_soporte: Optional[str] = ""
     numero_contrato: Optional[str] = ""
+    dominio: Optional[str] = "NETWORK"
     class Config:
         from_attributes = True
 
@@ -441,6 +453,7 @@ class ConsumibleBase(BaseModel):
     cantidad: Optional[int] = 0
     ubicacion: Optional[str] = "Depósito Principal"
     stock_minimo: Optional[int] = 5
+    dominio: Optional[str] = "NETWORK"
 
 class ConsumibleCreate(ConsumibleBase):
     pass
@@ -450,6 +463,7 @@ class ConsumibleUpdate(BaseModel):
     cantidad: Optional[int] = None
     ubicacion: Optional[str] = None
     stock_minimo: Optional[int] = None
+    dominio: Optional[str] = None
 
 # Custom response showing flat items directly to match streamlit df
 class ConsumibleResponse(BaseModel):
@@ -461,6 +475,7 @@ class ConsumibleResponse(BaseModel):
     cantidad: int
     ubicacion: str
     stock_minimo: int
+    dominio: str
     class Config:
         from_attributes = True
 
@@ -482,6 +497,7 @@ class HistorialResponse(BaseModel):
 #   ITAM CUSTOM SCHEMAS
 # ==================
 class ConsolidadoAssetResponse(BaseModel):
+    id: int
     tipo_equipo: str
     nombre: str
     marca: str
@@ -599,6 +615,7 @@ class UserCreate(BaseModel):
     password: str
     role_id: Optional[int] = None
     is_superadmin: Optional[bool] = False
+    dominio_asignado: Optional[str] = "ALL"
 
 class UserUpdate(BaseModel):
     username: Optional[str] = None
@@ -606,6 +623,7 @@ class UserUpdate(BaseModel):
     password: Optional[str] = None
     role_id: Optional[int] = None
     is_superadmin: Optional[bool] = None
+    dominio_asignado: Optional[str] = None
 
 class UserResponse(BaseModel):
     id: int
@@ -614,6 +632,7 @@ class UserResponse(BaseModel):
     role_id: Optional[int] = None
     role_nombre: Optional[str] = None
     is_superadmin: bool
+    dominio_asignado: Optional[str] = "ALL"
     class Config:
         from_attributes = True
 
@@ -682,5 +701,28 @@ class ItemPosition(BaseModel):
 class PlanoPosicionesRequest(BaseModel):
     racks: List[ItemPosition] = []
     hosts: List[ItemPosition] = []
+
+# ==================
+#   MANTENIMIENTOS
+# ==================
+class MantenimientoBase(BaseModel):
+    host_id: int
+    tipo: str # Enum: 'PREVENTIVO', 'CORRECTIVO', 'CAMBIO_BATERIA'
+    descripcion_trabajo: str
+    tecnico_responsable: str
+    costo: Optional[float] = None
+    proxima_fecha_sugerida: Optional[date] = None
+
+class MantenimientoCreate(MantenimientoBase):
+    restablecer_estado: Optional[bool] = True
+
+class MantenimientoResponse(MantenimientoBase):
+    id: int
+    usuario_id: Optional[int] = None
+    usuario_username: Optional[str] = None
+    fecha_ejecucion: datetime
+    
+    class Config:
+        from_attributes = True
 
 

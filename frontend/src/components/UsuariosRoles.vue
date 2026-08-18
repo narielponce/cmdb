@@ -40,6 +40,7 @@
                 <th>Nombre</th>
                 <th>Rol</th>
                 <th>Superadmin</th>
+                <th>Ámbito</th>
                 <th>Acciones</th>
               </tr>
             </thead>
@@ -53,6 +54,7 @@
                   <span v-else class="text-muted">Sin Rol</span>
                 </td>
                 <td>{{ user.is_superadmin ? 'Sí' : 'No' }}</td>
+                <td>{{ user.dominio_asignado || 'ALL' }}</td>
                 <td>
                   <button @click="editUser(user)" class="btn-action edit-btn">✏️</button>
                   <button @click="confirmDeleteUser(user)" class="btn-action delete-btn">🗑️</button>
@@ -87,6 +89,15 @@
                 <option v-for="role in roles" :key="role.id" :value="role.id">
                   {{ role.nombre }}
                 </option>
+              </select>
+            </div>
+            <div class="form-group" v-if="!userForm.is_superadmin">
+              <label>Ámbito / Dominio de Activos</label>
+              <select v-model="userForm.dominio_asignado" class="form-control">
+                <option value="ALL">ALL (Todos los dominios)</option>
+                <option value="NETWORK">NETWORK (Red / IT)</option>
+                <option value="FACILITIES">FACILITIES (Infraestructura / Energía)</option>
+                <option value="SHOPFLOOR">SHOPFLOOR (Planta / OT)</option>
               </select>
             </div>
             <div class="form-group row-checkbox">
@@ -245,7 +256,8 @@ export default {
       nombre: '',
       password: '',
       role_id: null,
-      is_superadmin: false
+      is_superadmin: false,
+      dominio_asignado: 'ALL'
     })
     
     const roleForm = ref({
@@ -294,7 +306,8 @@ export default {
         nombre: '',
         password: '',
         role_id: null,
-        is_superadmin: false
+        is_superadmin: false,
+        dominio_asignado: 'ALL'
       }
       userMessage.value = { text: '', type: 'success' }
     }
@@ -306,7 +319,8 @@ export default {
         nombre: user.nombre,
         password: '',
         role_id: user.role_id,
-        is_superadmin: user.is_superadmin
+        is_superadmin: user.is_superadmin,
+        dominio_asignado: user.dominio_asignado || 'ALL'
       }
       userMessage.value = { text: '', type: 'success' }
     }
@@ -320,7 +334,8 @@ export default {
             username: userForm.value.username,
             nombre: userForm.value.nombre,
             role_id: userForm.value.is_superadmin ? null : userForm.value.role_id,
-            is_superadmin: userForm.value.is_superadmin
+            is_superadmin: userForm.value.is_superadmin,
+            dominio_asignado: userForm.value.is_superadmin ? 'ALL' : userForm.value.dominio_asignado
           }
           if (userForm.value.password) {
             payload.password = userForm.value.password

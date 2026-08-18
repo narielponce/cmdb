@@ -262,8 +262,11 @@ def delete_blindobarra(db: Session, bb_id: int):
 # ==================
 #        UPS
 # ==================
-def get_ups_all(db: Session):
-    results = db.query(models.Host).join(models.TipoHost).filter(models.TipoHost.nombre == "UPS").order_by(models.Host.nombre.asc()).all()
+def get_ups_all(db: Session, dominio: str = None):
+    query = db.query(models.Host).join(models.TipoHost).filter(models.TipoHost.nombre == "UPS")
+    if dominio:
+        query = query.filter(models.Host.dominio == dominio)
+    results = query.order_by(models.Host.nombre.asc()).all()
     mapped = []
     for u in results:
         mapped.append({
@@ -288,7 +291,8 @@ def get_ups_all(db: Session):
             "fecha_eol": u.fecha_eol,
             "fin_garantia_contrato": u.fin_garantia_contrato,
             "proveedor_soporte": u.proveedor_soporte or "",
-            "numero_contrato": u.numero_contrato or ""
+            "numero_contrato": u.numero_contrato or "",
+            "dominio": u.dominio
         })
     return mapped
 
@@ -317,7 +321,8 @@ def get_ups(db: Session, ups_id: int):
             "vlan": u.vlan,
             "capacidad_kva": u.capacidad_kva or 0.0,
             "estado_baterias": u.estado.nombre if u.estado else "Ok",
-            "checkmk_host_id": u.checkmk_host_id
+            "checkmk_host_id": u.checkmk_host_id,
+            "dominio": u.dominio
         }
     return None
 
@@ -408,8 +413,11 @@ def delete_rack(db: Session, rack_id: int):
 # ==================
 #     SWITCHES
 # ==================
-def get_switches(db: Session):
-    results = db.query(models.Host).join(models.TipoHost).filter(models.TipoHost.nombre == "Switch").order_by(models.Host.nombre.asc()).all()
+def get_switches(db: Session, dominio: str = None):
+    query = db.query(models.Host).join(models.TipoHost).filter(models.TipoHost.nombre == "Switch")
+    if dominio:
+        query = query.filter(models.Host.dominio == dominio)
+    results = query.order_by(models.Host.nombre.asc()).all()
     mapped = []
     for s in results:
         mapped.append({
@@ -429,7 +437,8 @@ def get_switches(db: Session):
             "fecha_eol": s.fecha_eol,
             "fin_garantia_contrato": s.fin_garantia_contrato,
             "proveedor_soporte": s.proveedor_soporte or "",
-            "numero_contrato": s.numero_contrato or ""
+            "numero_contrato": s.numero_contrato or "",
+            "dominio": s.dominio
         })
     return mapped
 
@@ -453,7 +462,8 @@ def get_switch(db: Session, sw_id: int):
             "fecha_eol": s.fecha_eol,
             "fin_garantia_contrato": s.fin_garantia_contrato,
             "proveedor_soporte": s.proveedor_soporte or "",
-            "numero_contrato": s.numero_contrato or ""
+            "numero_contrato": s.numero_contrato or "",
+            "dominio": s.dominio
         }
     return None
 
@@ -503,8 +513,11 @@ def delete_switch(db: Session, sw_id: int):
 # ==================
 #       HOSTS
 # ==================
-def get_hosts(db: Session):
-    results = db.query(models.Host).join(models.TipoHost).filter(~models.TipoHost.nombre.in_(["UPS", "Switch", "Servidor"])).order_by(models.Host.nombre.asc()).all()
+def get_hosts(db: Session, dominio: str = None):
+    query = db.query(models.Host).join(models.TipoHost).filter(~models.TipoHost.nombre.in_(["UPS", "Switch", "Servidor"]))
+    if dominio:
+        query = query.filter(models.Host.dominio == dominio)
+    results = query.order_by(models.Host.nombre.asc()).all()
     mapped = []
     for h in results:
         mapped.append({
@@ -527,7 +540,8 @@ def get_hosts(db: Session):
             "fecha_eol": h.fecha_eol,
             "fin_garantia_contrato": h.fin_garantia_contrato,
             "proveedor_soporte": h.proveedor_soporte or "",
-            "numero_contrato": h.numero_contrato or ""
+            "numero_contrato": h.numero_contrato or "",
+            "dominio": h.dominio
         })
     return mapped
 
@@ -554,7 +568,8 @@ def get_host(db: Session, host_id: int):
             "fecha_eol": h.fecha_eol,
             "fin_garantia_contrato": h.fin_garantia_contrato,
             "proveedor_soporte": h.proveedor_soporte or "",
-            "numero_contrato": h.numero_contrato or ""
+            "numero_contrato": h.numero_contrato or "",
+            "dominio": h.dominio
         }
     return None
 
@@ -609,8 +624,11 @@ def delete_host(db: Session, host_id: int):
 # ==================
 #    SERVIDORES
 # ==================
-def get_servidores(db: Session):
-    results = db.query(models.Host).join(models.TipoHost).filter(models.TipoHost.nombre == "Servidor").order_by(models.Host.nombre.asc()).all()
+def get_servidores(db: Session, dominio: str = None):
+    query = db.query(models.Host).join(models.TipoHost).filter(models.TipoHost.nombre == "Servidor")
+    if dominio:
+        query = query.filter(models.Host.dominio == dominio)
+    results = query.order_by(models.Host.nombre.asc()).all()
     mapped = []
     for s in results:
         mapped.append({
@@ -631,7 +649,8 @@ def get_servidores(db: Session):
             "fecha_eol": s.fecha_eol,
             "fin_garantia_contrato": s.fin_garantia_contrato,
             "proveedor_soporte": s.proveedor_soporte or "",
-            "numero_contrato": s.numero_contrato or ""
+            "numero_contrato": s.numero_contrato or "",
+            "dominio": s.dominio
         })
     return mapped
 
@@ -656,7 +675,8 @@ def get_servidor(db: Session, srv_id: int):
             "fecha_eol": s.fecha_eol,
             "fin_garantia_contrato": s.fin_garantia_contrato,
             "proveedor_soporte": s.proveedor_soporte or "",
-            "numero_contrato": s.numero_contrato or ""
+            "numero_contrato": s.numero_contrato or "",
+            "dominio": s.dominio
         }
     return None
 
@@ -882,8 +902,11 @@ def get_o_crear_catalogo(db: Session, marca: str, modelo: str, tipo: str) -> int
 # ==================
 #   CONSUMIBLES
 # ==================
-def get_consumibles(db: Session):
-    results = db.query(models.StockConsumible).join(models.CatalogoEquipo).order_by(
+def get_consumibles(db: Session, dominio: str = None):
+    query = db.query(models.StockConsumible).join(models.CatalogoEquipo)
+    if dominio:
+        query = query.filter(models.StockConsumible.dominio == dominio)
+    results = query.order_by(
         models.CatalogoEquipo.marca.asc(),
         models.CatalogoEquipo.modelo.asc()
     ).all()
@@ -899,7 +922,8 @@ def get_consumibles(db: Session):
             "custom_table": c.catalogo.tipo,  # just in case
             "cantidad": c.cantidad,
             "ubicacion": c.ubicacion,
-            "stock_minimo": c.stock_minimo
+            "stock_minimo": c.stock_minimo,
+            "dominio": c.dominio
         })
     return output
 
@@ -1013,7 +1037,8 @@ def create_user(db: Session, user: schemas.UserCreate):
         nombre=user.nombre,
         hashed_password=hashed_pw,
         role_id=user.role_id,
-        is_superadmin=user.is_superadmin
+        is_superadmin=user.is_superadmin,
+        dominio_asignado=user.dominio_asignado or "ALL"
     )
     db.add(db_user)
     db.commit()
