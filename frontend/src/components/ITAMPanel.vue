@@ -864,6 +864,16 @@
             </div>
 
             <div style="grid-column: span 2;" class="form-group">
+              <label class="form-label text-xs">Usuario Registrante</label>
+              <select v-if="isSuperadmin" v-model="maintForm.usuario_id" class="form-input text-xs" style="width: 100%;" required>
+                <option v-for="u in maintUsers" :key="u.id" :value="u.id">{{ u.nombre }} ({{ u.username }})</option>
+              </select>
+              <select v-else :value="currentUserId" class="form-input text-xs" style="width: 100%;" disabled>
+                <option :value="currentUserId">{{ currentUserUsername }}</option>
+              </select>
+            </div>
+
+            <div style="grid-column: span 2;" class="form-group">
               <label class="form-label text-xs">Técnico Responsable</label>
               <input type="text" v-model="maintForm.tecnico_responsable" placeholder="Ej: Ing. Juan Pérez, Dpto. Soporte" class="form-input text-xs" style="width: 100%;" required />
             </div>
@@ -955,6 +965,10 @@ export default {
     })
 
     const user_dominio = ref('ALL')
+    const isSuperadmin = ref(false)
+    const currentUserId = ref(null)
+    const currentUserUsername = ref('')
+    const maintUsers = ref([])
 
     const loadUserPermissions = () => {
       const savedUser = localStorage.getItem('net_cmdb_user')
@@ -962,6 +976,9 @@ export default {
         const user = JSON.parse(savedUser)
         canWrite.value = user.is_superadmin || user.modules?.some(m => m.module_name === 'itam' && m.can_write)
         user_dominio.value = user.dominio_asignado || 'ALL'
+        isSuperadmin.value = !!user.is_superadmin
+        currentUserId.value = user.id
+        currentUserUsername.value = user.username
       }
     }
     
@@ -1347,7 +1364,15 @@ export default {
         descripcion_trabajo: '',
         costo: null,
         proxima_fecha_sugerida: '',
-        restablecer_estado: true
+        restablecer_estado: true,
+        usuario_id: currentUserId.value
+      }
+      if (isSuperadmin.value) {
+        axios.get('/api/usuarios').then(res => {
+          maintUsers.value = res.data
+        }).catch(err => {
+          console.error("Error fetching users for dropdown:", err)
+        })
       }
       showMaintModal.value = true
     }
@@ -1375,7 +1400,8 @@ export default {
         tecnico_responsable: maintForm.value.tecnico_responsable,
         costo: maintForm.value.costo ? parseFloat(maintForm.value.costo) : null,
         proxima_fecha_sugerida: maintForm.value.proxima_fecha_sugerida || null,
-        restablecer_estado: maintForm.value.restablecer_estado
+        restablecer_estado: maintForm.value.restablecer_estado,
+        usuario_id: maintForm.value.usuario_id
       }
       
       try {
@@ -1713,7 +1739,11 @@ export default {
       fetchMaintHistory,
       openMaintModal,
       openMaintModalForSelected,
-      submitMaint
+      submitMaint,
+      maintUsers,
+      isSuperadmin,
+      currentUserId,
+      currentUserUsername
     }
   }
 }

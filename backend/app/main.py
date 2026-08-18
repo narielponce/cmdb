@@ -2086,9 +2086,13 @@ def create_mantenimiento(
                 detail="No tiene permisos para gestionar activos fuera de su ámbito asignado"
             )
 
+    target_usuario_id = current_user.id
+    if current_user.is_superadmin and payload.usuario_id:
+        target_usuario_id = payload.usuario_id
+
     db_maint = models.Mantenimiento(
         host_id=payload.host_id,
-        usuario_id=current_user.id,
+        usuario_id=target_usuario_id,
         tipo=payload.tipo,
         descripcion_trabajo=payload.descripcion_trabajo,
         tecnico_responsable=payload.tecnico_responsable,

@@ -716,6 +716,7 @@ class MantenimientoBase(BaseModel):
 
 class MantenimientoCreate(MantenimientoBase):
     restablecer_estado: Optional[bool] = True
+    usuario_id: Optional[int] = None
 
 class MantenimientoResponse(MantenimientoBase):
     id: int
