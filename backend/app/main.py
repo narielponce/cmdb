@@ -1076,11 +1076,19 @@ def read_movimientos(db: Session = Depends(get_db)):
 #    API ENDPOINTS: ITAM CORE OPERATIONS
 # ==========================================
 @app.get("/api/inventario/consolidado", response_model=List[schemas.ConsolidadoAssetResponse])
-def get_inventario_consolidado(db: Session = Depends(get_db)):
+def get_inventario_consolidado(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     assets = []
     
+    # Check domain filter
+    domain_filter = None
+    if not current_user.is_superadmin and current_user.dominio_asignado != "ALL":
+        domain_filter = current_user.dominio_asignado
+        
     # 1. Switches
-    switches = db.query(models.Host).join(models.TipoHost).filter(models.TipoHost.nombre == "Switch").all()
+    q_sw = db.query(models.Host).join(models.TipoHost).filter(models.TipoHost.nombre == "Switch")
+    if domain_filter:
+        q_sw = q_sw.filter(models.Host.dominio == domain_filter)
+    switches = q_sw.all()
     for sw in switches:
         assets.append({
             "id": sw.id,
@@ -1090,11 +1098,15 @@ def get_inventario_consolidado(db: Session = Depends(get_db)):
             "modelo": sw.modelo,
             "serial": sw.serial,
             "ip": sw.ip,
-            "ubicacion_estado": "🟢 En Producción" if sw.rack_id else "📦 En Depósito"
+            "ubicacion_estado": "🟢 En Producción" if sw.rack_id else "📦 En Depósito",
+            "dominio": sw.dominio
         })
         
     # 2. UPS
-    ups_list = db.query(models.Host).join(models.TipoHost).filter(models.TipoHost.nombre == "UPS").all()
+    q_ups = db.query(models.Host).join(models.TipoHost).filter(models.TipoHost.nombre == "UPS")
+    if domain_filter:
+        q_ups = q_ups.filter(models.Host.dominio == domain_filter)
+    ups_list = q_ups.all()
     for ups in ups_list:
         assets.append({
             "id": ups.id,
@@ -1104,14 +1116,18 @@ def get_inventario_consolidado(db: Session = Depends(get_db)):
             "modelo": ups.modelo,
             "serial": ups.serial,
             "ip": ups.ip,
-            "ubicacion_estado": "🟢 En Producción" if ups.blindobarra_id else "📦 En Depósito"
+            "ubicacion_estado": "🟢 En Producción" if ups.blindobarra_id else "📦 En Depósito",
+            "dominio": ups.dominio
         })
         
     # 3. Hosts (Roles: AP, Cámara, PLC)
-    hosts = db.query(models.Host).join(models.TipoHost).filter(
+    q_hosts = db.query(models.Host).join(models.TipoHost).filter(
         models.TipoHost.nombre == "Host",
         models.Host.rol.in_(["AP", "Cámara", "PLC"])
-    ).all()
+    )
+    if domain_filter:
+        q_hosts = q_hosts.filter(models.Host.dominio == domain_filter)
+    hosts = q_hosts.all()
     for h in hosts:
         tipo = "📶 Access Point" if h.rol == "AP" else ("📷 Cámara IP" if h.rol == "Cámara" else "⚙️ Host Industrial")
         assets.append({
@@ -1122,10 +1138,23 @@ def get_inventario_consolidado(db: Session = Depends(get_db)):
             "modelo": h.modelo,
             "serial": h.serial,
             "ip": h.ip,
-            "ubicacion_estado": "🟢 En Producción" if h.switch_id else "📦 En Depósito"
+            "ubicacion_estado": "🟢 En Producción" if h.switch_id else "📦 En Depósito",
+            "dominio": h.dominio
         })
         
     return assets
+
+@app.get("/api/dashboard/stats")
+def get_dashboard_stats(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    assets = get_inventario_consolidado(db, current_user)
+    total_activos = len(assets)
+    en_deposito = sum(1 for a in assets if "Depósito" in a["ubicacion_estado"])
+    subestaciones_count = db.query(models.Subestacion).count()
+    return {
+        "total_activos_itam": total_activos,
+        "equipos_en_deposito": en_deposito,
+        "subestaciones_activas": subestaciones_count
+    }
 
 @app.post("/api/inventario/ingreso")
 async def registrar_ingreso(

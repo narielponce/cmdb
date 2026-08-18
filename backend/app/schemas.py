@@ -505,6 +505,7 @@ class ConsolidadoAssetResponse(BaseModel):
     serial: str
     ip: str
     ubicacion_estado: str
+    dominio: Optional[str] = "NETWORK"
 
 class DeployAssetRequest(BaseModel):
     tipo_equipo: str  # "🔌 Switch", "🔋 UPS", "📶 Access Point", "📷 Cámara IP", "⚙️ Host Industrial"

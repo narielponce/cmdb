@@ -150,12 +150,12 @@
           <p class="header-subtitle">{{ viewSubtitle }}</p>
         </div>
 
-        <!-- Views -->
         <KeepAlive>
           <component 
             :is="activeComponent" 
             :active-tab-prop="activeCrudTab" 
             @update-tab="updateActiveCrudTab" 
+            @navigate="switchView"
           />
         </KeepAlive>
       </main>

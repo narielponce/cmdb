@@ -8,10 +8,10 @@
           <span class="metric-label">Total de Activos ITAM</span>
           <span class="metric-icon">📦</span>
         </div>
-        <div class="metric-value">142</div>
+        <div class="metric-value">{{ loading ? '...' : stats.total_activos_itam }}</div>
         <div class="metric-delta delta-green">
-          <span>↑ 12%</span>
-          <span class="delta-desc">esta semana</span>
+          <span>Activos</span>
+          <span class="delta-desc">en el sistema</span>
         </div>
       </div>
 
@@ -21,7 +21,7 @@
           <span class="metric-label">Subestaciones Activas</span>
           <span class="metric-icon">⚡</span>
         </div>
-        <div class="metric-value">6</div>
+        <div class="metric-value">{{ loading ? '...' : stats.subestaciones_activas }}</div>
         <div class="metric-delta delta-green">
           <span>100%</span>
           <span class="delta-desc">operativas</span>
@@ -34,7 +34,7 @@
           <span class="metric-label">Equipos en Depósito</span>
           <span class="metric-icon">🏢</span>
         </div>
-        <div class="metric-value">28</div>
+        <div class="metric-value">{{ loading ? '...' : stats.equipos_en_deposito }}</div>
         <div class="metric-delta delta-green">
           <span>Listo para desplegar</span>
         </div>
@@ -139,7 +139,7 @@
     <div class="glass-panel quick-actions-panel">
       <h3 class="panel-title" style="margin-bottom: 1.25rem;">⚡ Accesos Rápidos de Gestión</h3>
       <div class="actions-grid">
-        <div class="action-card">
+        <div class="action-card" @click="$emit('navigate', 'simulator')">
           <span class="action-icon">🔮</span>
           <div class="action-details">
             <h4>Simular Caída de Red</h4>
@@ -147,7 +147,7 @@
           </div>
         </div>
 
-        <div class="action-card">
+        <div class="action-card" @click="$emit('navigate', 'itam')">
           <span class="action-icon">📥</span>
           <div class="action-details">
             <h4>Registrar Entrada</h4>
@@ -155,7 +155,7 @@
           </div>
         </div>
 
-        <div class="action-card">
+        <div class="action-card" @click="$emit('navigate', 'crud')">
           <span class="action-icon">📝</span>
           <div class="action-details">
             <h4>Gestionar CMDB</h4>
@@ -168,8 +168,42 @@
 </template>
 
 <script>
+import { ref, onMounted } from 'vue'
+import axios from 'axios'
+
 export default {
-  name: 'Dashboard'
+  name: 'Dashboard',
+  emits: ['navigate'],
+  setup() {
+    const stats = ref({
+      total_activos_itam: 0,
+      equipos_en_deposito: 0,
+      subestaciones_activas: 0
+    })
+
+    const loading = ref(false)
+
+    const fetchStats = async () => {
+      loading.value = true
+      try {
+        const response = await axios.get('/api/dashboard/stats')
+        stats.value = response.data
+      } catch (error) {
+        console.error("Error al cargar estadísticas de inicio:", error)
+      } finally {
+        loading.value = false
+      }
+    }
+
+    onMounted(() => {
+      fetchStats()
+    })
+
+    return {
+      stats,
+      loading
+    }
+  }
 }
 </script>
 
