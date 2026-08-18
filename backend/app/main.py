@@ -585,10 +585,37 @@ def seed_database(db: Session):
     
     print("✅ Seed completed!")
 
+def run_migrations(db_session):
+    from sqlalchemy import text
+    try:
+        db_session.execute(text("SELECT dominio FROM hosts LIMIT 1"))
+    except Exception:
+        db_session.rollback()
+        print("Migrating: Adding 'dominio' column to 'hosts' table...")
+        db_session.execute(text("ALTER TABLE hosts ADD COLUMN dominio VARCHAR NOT NULL DEFAULT 'NETWORK'"))
+        db_session.commit()
+
+    try:
+        db_session.execute(text("SELECT dominio FROM stock_consumibles LIMIT 1"))
+    except Exception:
+        db_session.rollback()
+        print("Migrating: Adding 'dominio' column to 'stock_consumibles' table...")
+        db_session.execute(text("ALTER TABLE stock_consumibles ADD COLUMN dominio VARCHAR NOT NULL DEFAULT 'NETWORK'"))
+        db_session.commit()
+
+    try:
+        db_session.execute(text("SELECT dominio_asignado FROM users LIMIT 1"))
+    except Exception:
+        db_session.rollback()
+        print("Migrating: Adding 'dominio_asignado' column to 'users' table...")
+        db_session.execute(text("ALTER TABLE users ADD COLUMN dominio_asignado VARCHAR NOT NULL DEFAULT 'ALL'"))
+        db_session.commit()
+
 # Seed call on startup
 @app.on_event("startup")
 def startup_event():
     db = next(get_db())
+    run_migrations(db)
     seed_database(db)
 
 # Mount files
