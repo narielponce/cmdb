@@ -6,7 +6,9 @@
       <div class="metric-card navy">
         <div class="metric-header">
           <span class="metric-label">Total de Activos ITAM</span>
-          <span class="metric-icon">📦</span>
+          <div class="metric-icon-wrapper">
+            <span>📦</span>
+          </div>
         </div>
         <div class="metric-value">{{ loading ? '...' : stats.total_activos_itam }}</div>
         <div class="metric-delta delta-green">
@@ -19,7 +21,9 @@
       <div class="metric-card blue-gradient">
         <div class="metric-header">
           <span class="metric-label">Subestaciones Activas</span>
-          <span class="metric-icon">⚡</span>
+          <div class="metric-icon-wrapper">
+            <span>⚡</span>
+          </div>
         </div>
         <div class="metric-value">{{ loading ? '...' : stats.subestaciones_activas }}</div>
         <div class="metric-delta delta-green">
@@ -32,7 +36,9 @@
       <div class="metric-card green-gradient">
         <div class="metric-header">
           <span class="metric-label">Equipos en Depósito</span>
-          <span class="metric-icon">🏢</span>
+          <div class="metric-icon-wrapper">
+            <span>🏢</span>
+          </div>
         </div>
         <div class="metric-value">{{ loading ? '...' : stats.equipos_en_deposito }}</div>
         <div class="metric-delta delta-green">

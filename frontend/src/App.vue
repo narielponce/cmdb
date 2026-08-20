@@ -91,24 +91,24 @@
               </a>
               
               <!-- Submenú de Carga de Datos -->
-              <ul v-if="currentView === 'crud'" class="pl-6 mt-1 space-y-1 bg-slate-50/50 rounded-lg p-2 border border-slate-100/50">
+              <ul v-if="currentView === 'crud'" class="pl-6 mt-1 space-y-1 bg-[#243048] rounded p-2 border border-slate-700/30">
                 <li v-for="group in tabGroups" :key="group.name" class="mb-1">
                   <!-- Cabecera de Categoría Colapsable -->
                   <button
                     @click.prevent="toggleGroup(group.name)"
-                    class="w-full flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-wider py-1.5 px-2 hover:text-slate-700 hover:bg-slate-100/50 rounded transition text-left"
+                    class="w-full flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-wider py-1.5 px-2 hover:text-white hover:bg-slate-700/50 rounded transition text-left"
                   >
                     <span>{{ group.name }}</span>
                     <span style="font-size: 8px; font-weight: normal; margin-left: 4px;">{{ expandedGroups[group.name] ? '▼' : '▶' }}</span>
                   </button>
                   
                   <!-- Listado de Sub-pestañas -->
-                  <ul v-show="expandedGroups[group.name]" class="space-y-0.5 mt-1 pl-2 border-l border-slate-200">
+                  <ul v-show="expandedGroups[group.name]" class="space-y-0.5 mt-1 pl-2 border-l border-slate-700/50">
                     <li v-for="tab in group.tabs" :key="tab.id">
                       <a
                         href="#"
                         @click.prevent="setCrudTab(tab.id, group.name)"
-                        :class="['block text-xs py-1 px-2 rounded-md transition font-medium', activeCrudTab === tab.id ? 'bg-primary/10 text-primary font-semibold' : 'text-slate-600 hover:bg-slate-100']"
+                        :class="['block text-xs py-1 px-2 rounded transition font-medium', activeCrudTab === tab.id ? 'bg-[#3c50e0] text-white font-semibold' : 'text-slate-400 hover:text-white hover:bg-slate-700/30']"
                       >
                         {{ tab.label }}
                       </a>
