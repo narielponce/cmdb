@@ -436,9 +436,10 @@ def get_switches(db: Session, dominio: str = None):
             "proximo_mantenimiento": s.proximo_mantenimiento,
             "fecha_eol": s.fecha_eol,
             "fin_garantia_contrato": s.fin_garantia_contrato,
-            "proveedor_soporte": s.proveedor_soporte or "",
             "numero_contrato": s.numero_contrato or "",
-            "dominio": s.dominio
+            "dominio": s.dominio,
+            "switch_id": s.switch_id,
+            "switch_nombre": s.switch.nombre if s.switch else ""
         })
     return mapped
 
@@ -463,7 +464,9 @@ def get_switch(db: Session, sw_id: int):
             "fin_garantia_contrato": s.fin_garantia_contrato,
             "proveedor_soporte": s.proveedor_soporte or "",
             "numero_contrato": s.numero_contrato or "",
-            "dominio": s.dominio
+            "dominio": s.dominio,
+            "switch_id": s.switch_id,
+            "switch_nombre": s.switch.nombre if s.switch else ""
         }
     return None
 

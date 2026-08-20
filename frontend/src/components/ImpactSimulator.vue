@@ -28,6 +28,10 @@
               <input type="radio" v-model="tipoCorte" value="Servidor" @change="cargarEntidades" />
               <span>Mantenimiento de Servidor TI</span>
             </label>
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+              <input type="radio" v-model="tipoCorte" value="Switch" @change="cargarEntidades" />
+              <span>Corte de Switch de Red (Core/Distribución/Acceso)</span>
+            </label>
           </div>
         </div>
 
@@ -424,6 +428,8 @@ export default {
           endpoint = '/api/racks'
         } else if (tipoCorte.value === 'Servidor') {
           endpoint = '/api/servidores'
+        } else if (tipoCorte.value === 'Switch') {
+          endpoint = '/api/switches'
         }
         
         const response = await axios.get(`${API_URL}${endpoint}`)

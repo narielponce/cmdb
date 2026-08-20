@@ -172,6 +172,7 @@ class SwitchBase(BaseModel):
     proveedor_soporte: Optional[str] = ""
     numero_contrato: Optional[str] = ""
     dominio: Optional[str] = "NETWORK"
+    switch_id: Optional[int] = None
 
 class SwitchCreate(SwitchBase):
     pass
@@ -193,6 +194,7 @@ class SwitchUpdate(BaseModel):
     proveedor_soporte: Optional[str] = None
     numero_contrato: Optional[str] = None
     dominio: Optional[str] = None
+    switch_id: Optional[int] = None
 
 class SwitchResponse(BaseModel):
     id: int
@@ -213,6 +215,8 @@ class SwitchResponse(BaseModel):
     proveedor_soporte: Optional[str] = ""
     numero_contrato: Optional[str] = ""
     dominio: Optional[str] = "NETWORK"
+    switch_id: Optional[int] = None
+    switch_nombre: Optional[str] = None
     class Config:
         from_attributes = True
 

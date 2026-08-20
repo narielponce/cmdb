@@ -1348,6 +1348,9 @@ def run_simulation(req: schemas.SimulationRequest, db: Session = Depends(get_db)
     elif req.tipo_corte == "Rack":
         res = simulator.simular_corte_rack(db, req.target_id)
         return {"tipo": "Rack", "resultados": res}
+    elif req.tipo_corte == "Switch":
+        res = simulator.simular_corte_switch(db, req.target_id)
+        return {"tipo": "Switch", "resultados": res}
     elif "Servidor" in req.tipo_corte:
         res = simulator.simular_mantenimiento_servidor(db, req.target_id)
         return {"tipo": "Servidor", "resultados": res}

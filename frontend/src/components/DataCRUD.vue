@@ -221,6 +221,7 @@
             <tr v-else-if="activeTab === 'switches'">
               <th>Nombre Switch</th>
               <th>Rack Ubicación</th>
+              <th>Switch Aguas Arriba (Cascada)</th>
               <th>Marca</th>
               <th>Modelo</th>
               <th>Nro Serie</th>
@@ -357,6 +358,12 @@
                   <select class="editable-cell" v-model="item.rack_id">
                     <option :value="null">-- Depósito (Ninguno) --</option>
                     <option v-for="rk in racks" :key="rk.id" :value="rk.id">{{ rk.nombre }}</option>
+                  </select>
+                </td>
+                <td>
+                  <select class="editable-cell" v-model="item.switch_id">
+                    <option :value="null">-- Ninguno (Core) --</option>
+                    <option v-for="sw in switches" :key="sw.id" v-show="sw.id !== item.id" :value="sw.id">{{ sw.nombre }}</option>
                   </select>
                 </td>
                 <td>
@@ -1209,6 +1216,7 @@ export default {
           defaultObj = {
             nombre: 'NUEVO_SW',
             rack_id: racks.value[0]?.id || null,
+            switch_id: null,
             marca: '',
             modelo: '',
             serial: '',
